@@ -11,7 +11,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Инициализация базы данных
-const db = new sqlite3.Database(process.env.NODE_ENV === 'production' ? '/tmp/wiki.db' : './wiki.db', (err) => {
+const db = new sqlite3.Database(path.join(__dirname, 'wiki.db'), (err) => {
     if (err) {
         console.error('Ошибка подключения к БД:', err);
     } else {
@@ -104,17 +104,16 @@ function initDatabase() {
         )`
     ];
 
-    // Создаем таблицы последовательно
+    // Функция создания таблиц
     function createTable(index) {
         if (index >= tables.length) {
-            // Все таблицы созданы, теперь создаем базовые категории
             createBaseCategories();
             return;
         }
         
         db.run(tables[index], function(err) {
             if (err) {
-                console.error(`Ошибка создания таблицы ${index + 1}:`, err);
+                console.error(`❌ Ошибка создания таблицы ${index + 1}:`, err);
             } else {
                 console.log(`✅ Таблица ${index + 1} создана/проверена`);
                 createTable(index + 1);
@@ -122,6 +121,7 @@ function initDatabase() {
         });
     }
 
+    // Функция создания категорий
     function createBaseCategories() {
         const baseCategories = [
             'Философия', 'Религия', 'История', 'Наука', 'Культура', 'Технологии'
@@ -130,13 +130,27 @@ function initDatabase() {
         baseCategories.forEach((name, index) => {
             db.run('INSERT OR IGNORE INTO categories (name) VALUES (?)', [name], function(err) {
                 if (err) {
-                    console.error('Ошибка создания категории:', name, err);
+                    console.error('❌ Ошибка создания категории:', name, err);
                 } else if (index === baseCategories.length - 1) {
                     console.log('✅ База данных инициализирована');
                 }
             });
         });
     }
+
+    // 🔧 ПРОВЕРКА ТАБЛИЦ - В САМОМ КОНЦЕ ФУНКЦИИ:
+    db.get("SELECT name FROM sqlite_master WHERE type='table' AND name='users'", (err, row) => {
+        if (err) {
+            console.error('❌ Ошибка проверки таблиц:', err);
+        } else if (!row) {
+            console.log('🔄 Таблицы не найдены, создаем...');
+            createTable(0);
+        } else {
+            console.log('✅ Таблицы уже существуют');
+            createBaseCategories();
+        }
+    });
+}
 
     // Начинаем создание таблиц
     createTable(0);
@@ -714,6 +728,8 @@ app.get('/register', (req, res) => {
 
 app.post('/register', async (req, res) => {
     try {
+        console.log('🔧 Регистрация:', req.body); // ДОБАВЬ ЭТУ СТРОКУ
+        
         const { username, password } = req.body;
 
         const existing = await db.getAsync('SELECT id FROM users WHERE username = ?', [username]);
@@ -733,8 +749,8 @@ app.post('/register', async (req, res) => {
         req.session.user = username;
         res.redirect('/');
     } catch (error) {
-        console.error('Ошибка:', error);
-        res.status(500).send('Ошибка при регистрации');
+        console.error('ОШИБКА РЕГИСТРАЦИИ:', error); // ДОБАВЬ ЭТУ СТРОКУ
+        res.status(500).send('Ошибка при регистрации: ' + error.message);
     }
 });
 
@@ -745,6 +761,8 @@ app.get('/login', (req, res) => {
 
 app.post('/login', async (req, res) => {
     try {
+        console.log('🔧 Вход:', req.body); // ДОБАВЬ ЭТУ СТРОКУ
+        
         const { username, password } = req.body;
 
         const user = await db.getAsync('SELECT * FROM users WHERE username = ?', [username]);
@@ -758,8 +776,8 @@ app.post('/login', async (req, res) => {
         req.session.user = username;
         res.redirect('/');
     } catch (error) {
-        console.error('Ошибка:', error);
-        res.status(500).send('Ошибка при входе');
+        console.error('ОШИБКА ВХОДА:', error); // ДОБАВЬ ЭТУ СТРОКУ
+        res.status(500).send('Ошибка при входе: ' + error.message);
     }
 });
 
