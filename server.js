@@ -5,78 +5,159 @@ const { marked } = require('marked');
 const bcrypt = require('bcryptjs');
 const session = require('express-session');
 const sqlite3 = require('sqlite3').verbose();
+const PDFDocument = require('pdfkit');
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 
 // Инициализация базы данных
-const db = new sqlite3.Database('./wiki.db', (err) => {
+const db = new sqlite3.Database(process.env.NODE_ENV === 'production' ? '/tmp/wiki.db' : './wiki.db', (err) => {
     if (err) {
         console.error('Ошибка подключения к БД:', err);
     } else {
-        console.log('Подключен к SQLite базе данных');
+        console.log('✅ Подключен к SQLite базе данных');
         initDatabase();
     }
 });
 
 function initDatabase() {
-    db.run(`CREATE TABLE IF NOT EXISTS users (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        username TEXT UNIQUE NOT NULL,
-        password TEXT NOT NULL,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )`);
+    // Создаем все таблицы последовательно
+    const tables = [
+        `CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE NOT NULL,
+            password TEXT NOT NULL,
+            email TEXT,
+            bio TEXT,
+            avatar TEXT DEFAULT '/images/default-avatar.png',
+            role TEXT DEFAULT 'user',
+            articles_count INTEGER DEFAULT 0,
+            edits_count INTEGER DEFAULT 0,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            last_seen DATETIME DEFAULT CURRENT_TIMESTAMP
+        )`,
+        
+        `CREATE TABLE IF NOT EXISTS articles (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT UNIQUE NOT NULL,
+            content TEXT NOT NULL,
+            summary TEXT,
+            author_id INTEGER,
+            views INTEGER DEFAULT 0,
+            is_featured BOOLEAN DEFAULT 0,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(author_id) REFERENCES users(id)
+        )`,
+        
+        `CREATE TABLE IF NOT EXISTS article_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            article_id INTEGER,
+            content TEXT NOT NULL,
+            author_id INTEGER,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(article_id) REFERENCES articles(id),
+            FOREIGN KEY(author_id) REFERENCES users(id)
+        )`,
+        
+        `CREATE TABLE IF NOT EXISTS categories (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT UNIQUE NOT NULL,
+            description TEXT,
+            color TEXT DEFAULT '#36c'
+        )`,
+        
+        `CREATE TABLE IF NOT EXISTS article_categories (
+            article_id INTEGER,
+            category_id INTEGER,
+            FOREIGN KEY(article_id) REFERENCES articles(id),
+            FOREIGN KEY(category_id) REFERENCES categories(id)
+        )`,
+        
+        `CREATE TABLE IF NOT EXISTS comments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            article_id INTEGER,
+            user_id INTEGER,
+            content TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(article_id) REFERENCES articles(id),
+            FOREIGN KEY(user_id) REFERENCES users(id)
+        )`,
+        
+        `CREATE TABLE IF NOT EXISTS favorites (
+            user_id INTEGER,
+            article_id INTEGER,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(user_id) REFERENCES users(id),
+            FOREIGN KEY(article_id) REFERENCES articles(id)
+        )`,
+        
+        `CREATE TABLE IF NOT EXISTS flags (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            article_id INTEGER,
+            user_id INTEGER,
+            reason TEXT,
+            status TEXT DEFAULT 'pending',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(article_id) REFERENCES articles(id),
+            FOREIGN KEY(user_id) REFERENCES users(id)
+        )`
+    ];
 
-    db.run(`CREATE TABLE IF NOT EXISTS articles (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        title TEXT UNIQUE NOT NULL,
-        content TEXT NOT NULL,
-        author_id INTEGER,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY(author_id) REFERENCES users(id)
-    )`);
+    // Создаем таблицы последовательно
+    function createTable(index) {
+        if (index >= tables.length) {
+            // Все таблицы созданы, теперь создаем базовые категории
+            createBaseCategories();
+            return;
+        }
+        
+        db.run(tables[index], function(err) {
+            if (err) {
+                console.error(`Ошибка создания таблицы ${index + 1}:`, err);
+            } else {
+                console.log(`✅ Таблица ${index + 1} создана/проверена`);
+                createTable(index + 1);
+            }
+        });
+    }
 
-    db.run(`CREATE TABLE IF NOT EXISTS article_history (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        article_id INTEGER,
-        content TEXT NOT NULL,
-        author_id INTEGER,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY(article_id) REFERENCES articles(id),
-        FOREIGN KEY(author_id) REFERENCES users(id)
-    )`);
+    function createBaseCategories() {
+        const baseCategories = [
+            'Философия', 'Религия', 'История', 'Наука', 'Культура', 'Технологии'
+        ];
+        
+        baseCategories.forEach((name, index) => {
+            db.run('INSERT OR IGNORE INTO categories (name) VALUES (?)', [name], function(err) {
+                if (err) {
+                    console.error('Ошибка создания категории:', name, err);
+                } else if (index === baseCategories.length - 1) {
+                    console.log('✅ База данных инициализирована');
+                }
+            });
+        });
+    }
+
+    // Начинаем создание таблиц
+    createTable(0);
 }
 
+// Middleware с 30-дневной сессией
 app.use(express.static('public'));
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(session({
-    secret: 'wiki-secret-key',
-    resave: false,
+    secret: process.env.SESSION_SECRET || 'wiki-secret-key-2024',
+    resave: true,
     saveUninitialized: false,
-    cookie: { maxAge: 24 * 60 * 60 * 1000 }
+    cookie: { 
+        secure: process.env.NODE_ENV === 'production',
+        maxAge: 30 * 24 * 60 * 60 * 1000 // 30 ДНЕЙ!
+    }
 }));
 
 app.set('views', path.join(__dirname, 'views'));
 app.set('view engine', 'ejs');
-
-function requireAuth(req, res, next) {
-    if (req.session.user) {
-        next();
-    } else {
-        res.redirect('/login');
-    }
-}
-
-// Проверка админских прав
-function requireAdmin(req, res, next) {
-    if (req.session.user === 'admin' || req.session.user === 'щура') {
-        next();
-    } else {
-        res.status(403).send('Доступ запрещен. Требуются права администратора.');
-    }
-}
 
 // Promisified DB методы
 db.getAsync = function(sql, params = []) {
@@ -106,84 +187,272 @@ db.runAsync = function(sql, params = []) {
     });
 };
 
-// Создание демо-статей
-async function createDemoArticles() {
-    const demoArticles = [
-        {
-            title: 'Главная',
-            content: '# Добро пожаловать в Щуропедию!\n\n' +
-                     'Это главная страница Щуропедии.\n\n' +
-                     '## Возможности\n\n' +
-                     '- Создание статей\n' +
-                     '- Редактирование статей\n' +
-                     '- История изменений\n' +
-                     '- Поиск по статьям\n\n' +
-                     '## Быстрый старт\n\n' +
-                     '[Создайте свою первую статью!](/create)'
-        },
-        {
-            title: 'Дядя Щура',
-            content: '# Дядя Щура\n\n' +
-                     '**Дядя Щура** (легендарный 1488 вв. до н.э.) — великий волхв и духовный учитель.\n\n' +
-                     '## Биография\n\n' +
-                     '### Ранние годы\n' +
-                     'Согласно древним преданиям, Дядя Щура родился в семье жрецов в регионе Восточной Скифии.\n\n' +
-                     '### Духовное пробуждение\n' +
-                     'В возрасте 30 лет пережил великое откровение, после которого начал проповедовать новое учение.'
-        }
-    ];
-
-    for (const article of demoArticles) {
-        try {
-            await db.runAsync(
-                'INSERT OR IGNORE INTO articles (title, content, author_id) VALUES (?, ?, ?)',
-                [article.title, article.content, 1]
-            );
-            console.log('Создана статья:', article.title);
-        } catch (error) {
-            console.log('Ошибка создания статьи:', article.title, error);
-        }
+function requireAuth(req, res, next) {
+    if (req.session.user) {
+        next();
+    } else {
+        res.redirect('/login');
     }
 }
 
-// Функция для получения статей (только из БД)
-async function getArticles() {
+function requireAdmin(req, res, next) {
+    if (req.session.user === 'admin' || req.session.user === 'щура') {
+        next();
+    } else {
+        res.status(403).send('Доступ запрещен. Требуются права администратора.');
+    }
+}
+
+// ПОИСК ПО СОДЕРЖИМОМУ
+app.get('/search', async (req, res) => {
     try {
-        const articles = await db.allAsync(
-            'SELECT title, articles.created_at, articles.updated_at, username FROM articles LEFT JOIN users ON articles.author_id = users.id ORDER BY articles.updated_at DESC'
+        const query = req.query.q;
+        if (!query) {
+            return res.render('search', { 
+                results: [], 
+                query: '', 
+                user: req.session.user 
+            });
+        }
+
+        const results = await db.allAsync(
+            `SELECT a.*, u.username, 
+                    (SELECT GROUP_CONCAT(c.name) 
+                     FROM article_categories ac 
+                     JOIN categories c ON ac.category_id = c.id 
+                     WHERE ac.article_id = a.id) as categories
+             FROM articles a 
+             LEFT JOIN users u ON a.author_id = u.id 
+             WHERE a.content LIKE ? OR a.title LIKE ?
+             ORDER BY a.updated_at DESC`,
+            [`%${query}%`, `%${query}%`]
         );
-        
-        if (articles && articles.length > 0) {
-            return articles.map(article => article.title);
-        }
-        
-        // Если в БД нет статей, создаем демо-статьи
-        console.log('Создаем демо-статьи...');
-        await createDemoArticles();
-        
-        // Пробуем снова
-        const newArticles = await db.allAsync('SELECT title FROM articles ORDER BY created_at DESC');
-        return newArticles.map(article => article.title);
-        
-    } catch (error) {
-        console.log('Ошибка получения статей:', error);
-        return ['Главная', 'Дядя Щура', 'Щуризм'];
-    }
-}
 
-// Главная страница
-app.get('/', async (req, res) => {
-    try {
-        const articles = await getArticles();
-        res.render('index', { 
-            articles: articles,
+        res.render('search', { 
+            results: results, 
+            query: query, 
             user: req.session.user 
         });
     } catch (error) {
+        console.error('Ошибка поиска:', error);
+        res.status(500).send('Ошибка при поиске');
+    }
+});
+
+// КАТЕГОРИИ
+app.get('/categories', async (req, res) => {
+    try {
+        const categories = await db.allAsync(`
+            SELECT c.*, COUNT(ac.article_id) as articles_count
+            FROM categories c
+            LEFT JOIN article_categories ac ON c.id = ac.category_id
+            GROUP BY c.id
+            ORDER BY articles_count DESC
+        `);
+
+        res.render('categories', {
+            categories: categories,
+            user: req.session.user
+        });
+    } catch (error) {
+        console.error('Ошибка:', error);
+        res.status(500).send('Ошибка при загрузке категорий');
+    }
+});
+
+app.get('/category/:name', async (req, res) => {
+    try {
+        const categoryName = req.params.name;
+        const articles = await db.allAsync(`
+            SELECT a.*, u.username
+            FROM articles a
+            JOIN article_categories ac ON a.id = ac.article_id
+            JOIN categories c ON ac.category_id = c.id
+            LEFT JOIN users u ON a.author_id = u.id
+            WHERE c.name = ?
+            ORDER BY a.updated_at DESC
+        `, [categoryName]);
+
+        res.render('category', {
+            category: categoryName,
+            articles: articles,
+            user: req.session.user
+        });
+    } catch (error) {
+        console.error('Ошибка:', error);
+        res.status(500).send('Ошибка при загрузке категории');
+    }
+});
+
+// КОММЕНТАРИИ
+app.post('/comment/:articleId', requireAuth, async (req, res) => {
+    try {
+        const articleId = req.params.articleId;
+        const { content } = req.body;
+        const user = await db.getAsync('SELECT id FROM users WHERE username = ?', [req.session.user]);
+
+        await db.runAsync(
+            'INSERT INTO comments (article_id, user_id, content) VALUES (?, ?, ?)',
+            [articleId, user.id, content]
+        );
+
+        res.redirect(`/article/${req.body.articleTitle}`);
+    } catch (error) {
+        console.error('Ошибка:', error);
+        res.status(500).send('Ошибка при добавлении комментария');
+    }
+});
+
+// ИЗБРАННОЕ
+app.post('/favorite/:articleId', requireAuth, async (req, res) => {
+    try {
+        const articleId = req.params.articleId;
+        const user = await db.getAsync('SELECT id FROM users WHERE username = ?', [req.session.user]);
+
+        // Проверяем нет ли уже в избранном
+        const existing = await db.getAsync(
+            'SELECT id FROM favorites WHERE user_id = ? AND article_id = ?',
+            [user.id, articleId]
+        );
+
+        if (existing) {
+            // Удаляем из избранного
+            await db.runAsync(
+                'DELETE FROM favorites WHERE user_id = ? AND article_id = ?',
+                [user.id, articleId]
+            );
+        } else {
+            // Добавляем в избранное
+            await db.runAsync(
+                'INSERT INTO favorites (user_id, article_id) VALUES (?, ?)',
+                [user.id, articleId]
+            );
+        }
+
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Ошибка:', error);
+        res.status(500).json({ success: false, error: 'Ошибка при изменении избранного' });
+    }
+});
+
+// ФЛАГИ/ЖАЛОБЫ
+app.post('/flag/:articleId', requireAuth, async (req, res) => {
+    try {
+        const articleId = req.params.articleId;
+        const { reason } = req.body;
+        const user = await db.getAsync('SELECT id FROM users WHERE username = ?', [req.session.user]);
+
+        await db.runAsync(
+            'INSERT INTO flags (article_id, user_id, reason) VALUES (?, ?, ?)',
+            [articleId, user.id, reason]
+        );
+
+        res.redirect(`/article/${req.body.articleTitle}?flagged=true`);
+    } catch (error) {
+        console.error('Ошибка:', error);
+        res.status(500).send('Ошибка при отправке жалобы');
+    }
+});
+
+// ЭКСПОРТ В PDF
+app.get('/export/pdf/:title', async (req, res) => {
+    try {
+        const title = req.params.title;
+        const article = await db.getAsync(
+            'SELECT a.*, u.username FROM articles a LEFT JOIN users u ON a.author_id = u.id WHERE a.title = ?',
+            [title]
+        );
+
+        if (!article) {
+            return res.status(404).send('Статья не найдена');
+        }
+
+        const doc = new PDFDocument();
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="${title}.pdf"`);
+
+        doc.pipe(res);
+
+        // Заголовок
+        doc.fontSize(20).text(article.title, 100, 100);
+        doc.fontSize(12).text(`Автор: ${article.username}`, 100, 130);
+        doc.fontSize(12).text(`Обновлено: ${new Date(article.updated_at).toLocaleDateString()}`, 100, 150);
+        
+        // Содержание
+        doc.moveDown(2);
+        const content = article.content.replace(/^#+/gm, ''); // Убираем markdown заголовки
+        doc.fontSize(12).text(content, 100, 200, { align: 'justify' });
+
+        doc.end();
+    } catch (error) {
+        console.error('Ошибка экспорта:', error);
+        res.status(500).send('Ошибка при экспорте в PDF');
+    }
+});
+
+// Функция для получения всех статей
+async function getAllArticles() {
+    try {
+        const articles = await db.allAsync(
+            'SELECT title FROM articles ORDER BY updated_at DESC'
+        );
+        return articles.map(article => article.title);
+    } catch (error) {
+        console.log('Ошибка получения статей:', error);
+        return [];
+    }
+}
+
+// ГЛАВНАЯ СТРАНИЦА - УПРОЩЕННАЯ ВЕРСИЯ
+app.get('/', async (req, res) => {
+    try {
+        // Получаем все статьи для списка
+        const articles = await getAllArticles();
+        
+        // Получаем последние статьи для блока "Недавние правки"
+        const recentArticles = await db.allAsync(`
+            SELECT a.*, u.username 
+            FROM articles a 
+            LEFT JOIN users u ON a.author_id = u.id 
+            ORDER BY a.updated_at DESC 
+            LIMIT 10
+        `);
+
+        // Получаем популярные статьи (по просмотрам)
+        const popularArticles = await db.allAsync(`
+            SELECT a.*, u.username 
+            FROM articles a 
+            LEFT JOIN users u ON a.author_id = u.id 
+            ORDER BY a.views DESC 
+            LIMIT 5
+        `);
+
+        // Получаем случайную статью
+        const randomArticle = await db.getAsync(`
+            SELECT a.*, u.username 
+            FROM articles a 
+            LEFT JOIN users u ON a.author_id = u.id 
+            ORDER BY RANDOM() 
+            LIMIT 1
+        `);
+
+        res.render('index', {
+            articles: articles,
+            recentArticles: recentArticles,
+            popularArticles: popularArticles,
+            randomArticle: randomArticle,
+            user: req.session.user
+        });
+    } catch (error) {
         console.error('Ошибка главной страницы:', error);
-        res.render('index', { 
-            articles: ['Главная', 'Дядя Щура', 'Щуризм'],
-            user: req.session.user 
+        // В случае ошибки показываем пустую главную страницу
+        res.render('index', {
+            articles: [],
+            recentArticles: [],
+            popularArticles: [],
+            randomArticle: null,
+            user: req.session.user
         });
     }
 });
@@ -202,6 +471,13 @@ app.get('/article/:title', async (req, res) => {
 
         if (article) {
             console.log('Статья найдена в БД');
+            
+            // Увеличиваем счетчик просмотров
+            await db.runAsync(
+                'UPDATE articles SET views = views + 1 WHERE id = ?',
+                [article.id]
+            );
+            
             const content = marked(article.content);
             return res.render('article', { 
                 title: article.title, 
@@ -259,26 +535,28 @@ app.post('/save/:title', requireAuth, async (req, res) => {
         const existingArticle = await db.getAsync('SELECT * FROM articles WHERE title = ?', [title]);
         
         if (existingArticle) {
+            // Сохраняем в историю предыдущую версию
             await db.runAsync(
                 'INSERT INTO article_history (article_id, content, author_id) VALUES (?, ?, ?)',
                 [existingArticle.id, existingArticle.content, user.id]
             );
             
+            // Обновляем статью
             await db.runAsync(
                 'UPDATE articles SET content = ?, author_id = ?, updated_at = CURRENT_TIMESTAMP WHERE title = ?',
                 [content, user.id, title]
             );
         } else {
-            await db.runAsync(
+            // Создаем новую статью
+            const result = await db.runAsync(
                 'INSERT INTO articles (title, content, author_id) VALUES (?, ?, ?)',
                 [title, content, user.id]
             );
             
-            const newArticle = await db.getAsync('SELECT * FROM articles WHERE title = ?', [title]);
-            
+            // Сохраняем в историю
             await db.runAsync(
                 'INSERT INTO article_history (article_id, content, author_id) VALUES (?, ?, ?)',
-                [newArticle.id, content, user.id]
+                [result.id, content, user.id]
             );
         }
 
@@ -331,11 +609,14 @@ app.post('/restore/:history_id', requireAuth, async (req, res) => {
 
         const user = await db.getAsync('SELECT id FROM users WHERE username = ?', [req.session.user]);
         const currentArticle = await db.getAsync('SELECT * FROM articles WHERE id = ?', [history.article_id]);
+        
+        // Сохраняем текущую версию в историю
         await db.runAsync(
             'INSERT INTO article_history (article_id, content, author_id) VALUES (?, ?, ?)',
             [history.article_id, currentArticle.content, user.id]
         );
 
+        // Восстанавливаем старую версию
         await db.runAsync(
             'UPDATE articles SET content = ?, author_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
             [history.content, user.id, history.article_id]
@@ -397,8 +678,9 @@ app.post('/create', requireAuth, async (req, res) => {
         const title = req.body.title;
         const content = req.body.content || '# ' + title + '\n\nНачните писать вашу статью здесь...';
         const user = await db.getAsync('SELECT id FROM users WHERE username = ?', [req.session.user]);
-        const safeTitle = title.toLowerCase().replace(/[^a-z0-9а-яё\-]/g, '-');
-        const existing = await db.getAsync('SELECT id FROM articles WHERE title = ?', [safeTitle]);
+        
+        // Проверяем существование статьи
+        const existing = await db.getAsync('SELECT id FROM articles WHERE title = ?', [title]);
         if (existing) {
             return res.render('create', { 
                 error: 'Статья с таким названием уже существует',
@@ -406,17 +688,19 @@ app.post('/create', requireAuth, async (req, res) => {
             });
         }
 
+        // Создаем статью
         const result = await db.runAsync(
             'INSERT INTO articles (title, content, author_id) VALUES (?, ?, ?)',
-            [safeTitle, content, user.id]
+            [title, content, user.id]
         );
 
+        // Сохраняем в историю
         await db.runAsync(
             'INSERT INTO article_history (article_id, content, author_id) VALUES (?, ?, ?)',
             [result.id, content, user.id]
         );
 
-        res.redirect(`/article/${safeTitle}`);
+        res.redirect(`/article/${title}`);
     } catch (error) {
         console.error('Ошибка:', error);
         res.status(500).send('Ошибка при создании статьи');
@@ -489,4 +773,5 @@ app.post('/logout', (req, res) => {
 app.listen(PORT, () => {
     console.log('Щуропедия запущена на http://localhost:' + PORT);
     console.log('Используется SQLite база данных');
+    console.log('Приложение готово к созданию статей пользователями');
 });

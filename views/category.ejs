@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Категория: <%= category %> - Щуропедия</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <header>
+        <h1><a href="/">Щуропедия</a></h1>
+        <div class="auth-links">
+            <% if (user) { %>
+                <span>Вы вошли как: <strong><%= user %></strong></span>
+                <form method="POST" action="/logout" style="display: inline;">
+                    <button type="submit">Выйти</button>
+                </form>
+                <a href="/create">Создать статью</a>
+            <% } else { %>
+                <a href="/login">Войти</a> | <a href="/register">Регистрация</a>
+            <% } %>
+        </div>
+    </header>
+
+    <main>
+        <div class="content">
+            <h1>Категория: <%= category %></h1>
+            <p><a href="/categories">← Все категории</a></p>
+            
+            <% if (articles.length > 0) { %>
+                <div class="articles-grid">
+                    <% articles.forEach(article => { %>
+                        <div class="article-card">
+                            <h3><a href="/article/<%= article.title %>"><%= article.title %></a></h3>
+                            <p class="meta">Автор: <%= article.username %> • <%= new Date(article.updated_at).toLocaleDateString() %></p>
+                            <p class="preview"><%= article.content.substring(0, 150) %>...</p>
+                        </div>
+                    <% }); %>
+                </div>
+            <% } else { %>
+                <p>В этой категории пока нет статей.</p>
+            <% } %>
+        </div>
+    </main>
+
+    <div class="theme-switcher">
+        <button class="theme-toggle" onclick="toggleTheme()">🌙</button>
+    </div>
+
+    <script>
+    function toggleTheme() {
+        document.body.classList.toggle('dark-theme');
+        const isDark = document.body.classList.contains('dark-theme');
+        localStorage.setItem('darkTheme', isDark);
+        document.querySelector('.theme-toggle').textContent = isDark ? '☀️' : '🌙';
+    }
+
+    if (localStorage.getItem('darkTheme') === 'true') {
+        document.body.classList.add('dark-theme');
+        document.querySelector('.theme-toggle').textContent = '☀️';
+    }
+    </script>
+</body>
+</html>

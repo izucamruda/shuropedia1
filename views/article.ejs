@@ -36,6 +36,28 @@
                 </div>
             <% } %>
         </div>
+		<div class="article-actions">
+    <% if (user) { %>
+        <a href="/edit/<%= title %>" class="action-btn primary">✏️ Редактировать</a>
+        <a href="/history/<%= title %>" class="action-btn">📜 История</a>
+        <button class="action-btn favorite-btn" onclick="toggleFavorite(<%= article.id %>)">⭐ В избранное</button>
+    <% } %>
+</div>
+
+<!-- ДОБАВЬ блок комментариев: -->
+<div class="comments-section">
+    <h3>💬 Комментарии</h3>
+    
+    <% if (user) { %>
+        <form method="POST" action="/comment/<%= article.id %>" class="comment-form">
+            <input type="hidden" name="articleTitle" value="<%= title %>">
+            <textarea name="content" placeholder="Ваш комментарий..." required></textarea>
+            <button type="submit" class="action-btn primary">Отправить</button>
+        </form>
+    <% } %>
+    
+    <!-- Здесь будут комментарии -->
+</div>
     </main>
 </body>
 </html>

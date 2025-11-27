@@ -33,54 +33,26 @@
                 <% }); %>
             </ul>
         </div>
-        <div class="content">
-            <h2>Добро пожаловать в Щуропедию</h2>
-            <p>Это база знаний щуриизма. Здесь вы можете хранить статьи, заметки и другую важную информацию для щуриисткого учения.</p>
-            
-            <h3>Как пользоваться:</h3>
-            <ul>
-                <li>Выберите статью из списка слева</li>
-                <li>Используйте поиск для быстрого перехода</li>
-                <li>Создавайте новые статьи в папке <code>articles/</code></li>
-            </ul>
-        </div>
-    </main>
-    <script src="/script.js"></script>
-	<div class="theme-switcher">
-    <button class="theme-toggle" onclick="toggleTheme()">🌙</button>
+<div class="content">
+    <h2>Добро пожаловать в Щуропедию</h2>
+    <p>Это база знаний щуриизма. Здесь вы можете хранить статьи, заметки и другую важную информацию для щуриисткого учения.</p>
+    
+    <h3>Как пользоваться:</h3>
+    <ul>
+        <li>Выберите статью из списка слева</li>
+        <li>Используйте поиск для быстрого перехода</li>
+        <li>Создавайте новые статьи через меню</li>
+    </ul>
+    
+    <div style="margin-top: 2rem; padding: 1.5rem; background: #f8f9fa; border-radius: 8px;">
+        <h4>Быстрые ссылки:</h4>
+        <p>
+            <a href="/create" style="color: #36c; text-decoration: none; font-weight: 500;">📝 Создать статью</a> | 
+            <a href="/categories" style="color: #36c; text-decoration: none; font-weight: 500;">📚 Категории</a> | 
+            <a href="/search" style="color: #36c; text-decoration: none; font-weight: 500;">🔍 Поиск</a>
+        </p>
+    </div>
 </div>
-
-<script>
-function toggleTheme() {
-    document.body.classList.toggle('dark-theme');
-    const isDark = document.body.classList.contains('dark-theme');
-    localStorage.setItem('darkTheme', isDark);
-    document.querySelector('.theme-toggle').textContent = isDark ? '☀️' : '🌙';
-}
-
-// Загрузка темы из localStorage
-if (localStorage.getItem('darkTheme') === 'true') {
-    document.body.classList.add('dark-theme');
-    document.querySelector('.theme-toggle').textContent = '☀️';
-}
-</script>
-<div class="theme-switcher">
-    <button class="theme-toggle" onclick="toggleTheme()">🌙</button>
-</div>
-
-<script>
-function toggleTheme() {
-    document.body.classList.toggle('dark-theme');
-    const isDark = document.body.classList.contains('dark-theme');
-    localStorage.setItem('darkTheme', isDark);
-    document.querySelector('.theme-toggle').textContent = isDark ? '☀️' : '🌙';
-}
-
-// Загрузка темы из localStorage
-if (localStorage.getItem('darkTheme') === 'true') {
-    document.body.classList.add('dark-theme');
-    document.querySelector('.theme-toggle').textContent = '☀️';
-}
 </script>
 </body>
 </html>

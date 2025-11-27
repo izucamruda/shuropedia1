@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Поиск: <%= query %> - Щуропедия</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <header>
+        <h1><a href="/">Щуропедия</a></h1>
+        <form method="GET" action="/search" class="search-form">
+            <input type="text" name="q" value="<%= query %>" placeholder="Поиск по статьям...">
+            <button type="submit">🔍</button>
+        </form>
+        <div class="auth-links">
+            <!-- auth links как в других шаблонах -->
+        </div>
+    </header>
+
+    <main>
+        <div class="search-results">
+            <h2>Результаты поиска: "<%= query %>"</h2>
+            
+            <% if (results.length > 0) { %>
+                <div class="results-list">
+                    <% results.forEach(article => { %>
+                        <div class="search-result">
+                            <h3><a href="/article/<%= article.title %>"><%= article.title %></a></h3>
+                            <p class="meta">Автор: <%= article.username %> • <%= new Date(article.updated_at).toLocaleDateString() %></p>
+                            <p class="preview"><%= article.content.substring(0, 200) %>...</p>
+                        </div>
+                    <% }); %>
+                </div>
+            <% } else if (query) { %>
+                <p>Ничего не найдено по запросу "<%= query %>"</p>
+            <% } %>
+        </div>
+    </main>
+</body>
+</html>
