@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Создание статьи - Щуропедия</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <header>
+        <h1><a href="/">Щуропедия</a></h1>
+        <div class="auth-links">
+            <span class="user-info">
+                Вы вошли как: <strong><%= user %></strong>
+                <form method="POST" action="/logout" style="display: inline;">
+                    <button type="submit">Выйти</button>
+                </form>
+            </span>
+        </div>
+    </header>
+    <main>
+        <div class="edit-container">
+            <h2>Создание новой статьи</h2>
+            <% if (typeof error !== 'undefined') { %>
+                <div class="error"><%= error %></div>
+            <% } %>
+            <form method="POST" action="/create">
+                <input type="text" name="title" placeholder="Название статьи" required>
+                <textarea name="content" rows="15" placeholder="Содержание статьи в формате Markdown..."></textarea>
+                <div class="edit-buttons">
+                    <button type="submit">Создать статью</button>
+                    <a href="/" class="button">Отмена</a>
+                </div>
+            </form>
+        </div>
+    </main>
+
+    <div class="theme-switcher">
+        <button class="theme-toggle" onclick="toggleTheme()">🌙</button>
+    </div>
+
+    <script>
+    function toggleTheme() {
+        document.body.classList.toggle('dark-theme');
+        const isDark = document.body.classList.contains('dark-theme');
+        localStorage.setItem('darkTheme', isDark);
+        document.querySelector('.theme-toggle').textContent = isDark ? '☀️' : '🌙';
+    }
+
+    if (localStorage.getItem('darkTheme') === 'true') {
+        document.body.classList.add('dark-theme');
+        document.querySelector('.theme-toggle').textContent = '☀️';
+    }
+    </script>
+</body>
+</html>

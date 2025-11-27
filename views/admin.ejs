@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Панель администратора - Щуропедия</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <header>
+        <h1><a href="/">Щуропедия</a></h1>
+        <div class="auth-links">
+            <span class="user-info">
+                Админ: <strong><%= user %></strong>
+                <form method="POST" action="/logout" style="display: inline;">
+                    <button type="submit">Выйти</button>
+                </form>
+                <a href="/">На сайт</a>
+            </span>
+        </div>
+    </header>
+    <main>
+        <div class="admin-container">
+            <h2>🔧 Панель администратора</h2>
+            
+            <div class="admin-section">
+                <h3>Все статьи (<%= articles.length %>)</h3>
+                <div class="articles-list">
+                    <% articles.forEach(function(article) { %>
+                        <div class="article-item">
+                            <div class="article-info">
+                                <strong><a href="/article/<%= article.title %>"><%= article.title %></a></strong>
+                                <span>Автор: <%= article.username || 'неизвестен' %></span>
+                                <span>Изменений: <%= article.history_count %></span>
+                                <span>Обновлено: <%= new Date(article.updated_at).toLocaleString() %></span>
+                            </div>
+                            <div class="article-actions">
+                                <a href="/edit/<%= article.title %>" class="btn-edit">✏️</a>
+                                <a href="/history/<%= article.title %>" class="btn-history">📜</a>
+                                <form method="POST" action="/delete/<%= article.title %>" style="display: inline;">
+                                    <button type="submit" class="btn-delete" onclick="return confirm('Удалить статью «<%= article.title %>»?')">🗑️</button>
+                                </form>
+                            </div>
+                        </div>
+                    <% }); %>
+                </div>
+            </div>
+            
+            <div class="admin-section">
+                <h3>👥 Пользователи (<%= users.length %>)</h3>
+                <div class="users-list">
+                    <% users.forEach(function(user) { %>
+                        <div class="user-item">
+                            <strong><%= user.username %></strong>
+                            <span>Зарегистрирован: <%= new Date(user.created_at).toLocaleString() %></span>
+                        </div>
+                    <% }); %>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <div class="theme-switcher">
+        <button class="theme-toggle" onclick="toggleTheme()">🌙</button>
+    </div>
+
+    <script>
+    function toggleTheme() {
+        document.body.classList.toggle('dark-theme');
+        const isDark = document.body.classList.contains('dark-theme');
+        localStorage.setItem('darkTheme', isDark);
+        document.querySelector('.theme-toggle').textContent = isDark ? '☀️' : '🌙';
+    }
+
+    if (localStorage.getItem('darkTheme') === 'true') {
+        document.body.classList.add('dark-theme');
+        document.querySelector('.theme-toggle').textContent = '☀️';
+    }
+    </script>
+</body>
+</html>

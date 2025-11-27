@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>История: <%= title %> - Щуропедия</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <header>
+        <h1><a href="/">Щуропедия</a></h1>
+        <div class="user-info">
+            <% if (user) { %>
+                Вы вошли как: <strong><%= user %></strong>
+                <form method="POST" action="/logout" style="display: inline;">
+                    <button type="submit">Выйти</button>
+                </form>
+            <% } else { %>
+                <a href="/login">Войти</a> | <a href="/register">Регистрация</a>
+            <% } %>
+        </div>
+    </header>
+    <main>
+        <div class="history-container">
+            <h2>История изменений: <%= title %></h2>
+            <p><a href="/article/<%= title %>">← Вернуться к статье</a></p>
+            
+            <div class="history-list">
+                <% history.forEach(function(version) { %>
+                    <div class="history-item">
+                        <div class="history-header">
+                            <strong>Версия от <%= new Date(version.created_at).toLocaleString() %></strong>
+                            <span>Автор: <%= version.username || 'Неизвестен' %></span>
+                        </div>
+                        <div class="history-content">
+                            <pre><%= version.content.substring(0, 200) %>...</pre>
+                        </div>
+                        <% if (user) { %>
+                            <form method="POST" action="/restore/<%= version.id %>" style="display: inline;">
+                                <button type="submit" class="restore-btn">Восстановить эту версию</button>
+                            </form>
+                        <% } %>
+                    </div>
+                <% }); %>
+            </div>
+        </div>
+    </main>
+	<div class="theme-switcher">
+    <button class="theme-toggle" onclick="toggleTheme()">🌙</button>
+</div>
+
+<script>
+function toggleTheme() {
+    document.body.classList.toggle('dark-theme');
+    const isDark = document.body.classList.contains('dark-theme');
+    localStorage.setItem('darkTheme', isDark);
+    document.querySelector('.theme-toggle').textContent = isDark ? '☀️' : '🌙';
+}
+
+// Загрузка темы из localStorage
+if (localStorage.getItem('darkTheme') === 'true') {
+    document.body.classList.add('dark-theme');
+    document.querySelector('.theme-toggle').textContent = '☀️';
+}
+</script>
+</body>
+</html>

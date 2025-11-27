@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= title %> - Щуропедия</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <header>
+        <h1><a href="/">Щуропедия</a></h1>
+        <div class="auth-links">
+            <% if (user) { %>
+                <span>Вы вошли как: <strong><%= user %></strong></span>
+                <form method="POST" action="/logout" style="display: inline;">
+                    <button type="submit">Выйти</button>
+                </form>
+                <a href="/create">Создать статью</a>
+            <% } else { %>
+                <a href="/login">Войти</a> | <a href="/register">Регистрация</a>
+            <% } %>
+        </div>
+    </header>
+    <main>
+        <div class="content">
+            <h1><%= title %></h1>
+            <div>
+                <%- content %>
+            </div>
+            
+            <% if (user) { %>
+                <div style="margin-top: 20px;">
+                    <a href="/edit/<%= title %>">Редактировать</a> | 
+                    <a href="/history/<%= title %>">История</a> | 
+                    <a href="/create">Создать новую</a>
+                </div>
+            <% } %>
+        </div>
+    </main>
+</body>
+</html>

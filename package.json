@@ -1,0 +1,25 @@
+{
+  "name": "shuropedia",
+  "version": "1.0.0",
+  "description": "Оплот мудрости шуриизма",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "keywords": [
+    "wiki",
+    "node",
+    "express"
+  ],
+  "author": "Izya",
+  "license": "MIT",
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "ejs": "^3.1.9",
+    "express": "^4.18.2",
+    "express-session": "^1.18.2",
+    "marked": "^9.1.2",
+    "sqlite3": "^5.1.7"
+  }
+}
