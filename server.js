@@ -21,140 +21,28 @@ const db = new sqlite3.Database(path.join(__dirname, 'wiki.db'), (err) => {
 });
 
 function initDatabase() {
-    // Создаем все таблицы последовательно
-    const tables = [
-        `CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            username TEXT UNIQUE NOT NULL,
-            password TEXT NOT NULL,
-            email TEXT,
-            bio TEXT,
-            avatar TEXT DEFAULT '/images/default-avatar.png',
-            role TEXT DEFAULT 'user',
-            articles_count INTEGER DEFAULT 0,
-            edits_count INTEGER DEFAULT 0,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            last_seen DATETIME DEFAULT CURRENT_TIMESTAMP
-        )`,
-        
-        `CREATE TABLE IF NOT EXISTS articles (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            title TEXT UNIQUE NOT NULL,
-            content TEXT NOT NULL,
-            summary TEXT,
-            author_id INTEGER,
-            views INTEGER DEFAULT 0,
-            is_featured BOOLEAN DEFAULT 0,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY(author_id) REFERENCES users(id)
-        )`,
-        
-        `CREATE TABLE IF NOT EXISTS article_history (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            article_id INTEGER,
-            content TEXT NOT NULL,
-            author_id INTEGER,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY(article_id) REFERENCES articles(id),
-            FOREIGN KEY(author_id) REFERENCES users(id)
-        )`,
-        
-        `CREATE TABLE IF NOT EXISTS categories (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT UNIQUE NOT NULL,
-            description TEXT,
-            color TEXT DEFAULT '#36c'
-        )`,
-        
-        `CREATE TABLE IF NOT EXISTS article_categories (
-            article_id INTEGER,
-            category_id INTEGER,
-            FOREIGN KEY(article_id) REFERENCES articles(id),
-            FOREIGN KEY(category_id) REFERENCES categories(id)
-        )`,
-        
-        `CREATE TABLE IF NOT EXISTS comments (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            article_id INTEGER,
-            user_id INTEGER,
-            content TEXT,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY(article_id) REFERENCES articles(id),
-            FOREIGN KEY(user_id) REFERENCES users(id)
-        )`,
-        
-        `CREATE TABLE IF NOT EXISTS favorites (
-            user_id INTEGER,
-            article_id INTEGER,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY(user_id) REFERENCES users(id),
-            FOREIGN KEY(article_id) REFERENCES articles(id)
-        )`,
-        
-        `CREATE TABLE IF NOT EXISTS flags (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            article_id INTEGER,
-            user_id INTEGER,
-            reason TEXT,
-            status TEXT DEFAULT 'pending',
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY(article_id) REFERENCES articles(id),
-            FOREIGN KEY(user_id) REFERENCES users(id)
-        )`
-    ];
-
-    // Функция создания таблиц
-    function createTable(index) {
-        if (index >= tables.length) {
-            createBaseCategories();
-            return;
-        }
-        
-        db.run(tables[index], function(err) {
-            if (err) {
-                console.error(`❌ Ошибка создания таблицы ${index + 1}:`, err);
-            } else {
-                console.log(`✅ Таблица ${index + 1} создана/проверена`);
-                createTable(index + 1);
-            }
-        });
-    }
-
-    // Функция создания категорий
-    function createBaseCategories() {
-        const baseCategories = [
-            'Философия', 'Религия', 'История', 'Наука', 'Культура', 'Технологии'
-        ];
-        
-        baseCategories.forEach((name, index) => {
-            db.run('INSERT OR IGNORE INTO categories (name) VALUES (?)', [name], function(err) {
-                if (err) {
-                    console.error('❌ Ошибка создания категории:', name, err);
-                } else if (index === baseCategories.length - 1) {
-                    console.log('✅ База данных инициализирована');
-                }
-            });
-        });
-    }
-
-    // 🔧 ПРОВЕРКА ТАБЛИЦ - В САМОМ КОНЦЕ ФУНКЦИИ:
-    db.get("SELECT name FROM sqlite_master WHERE type='table' AND name='users'", (err, row) => {
-        if (err) {
-            console.error('❌ Ошибка проверки таблиц:', err);
-        } else if (!row) {
-            console.log('🔄 Таблицы не найдены, создаем...');
-            createTable(0);
-        } else {
-            console.log('✅ Таблицы уже существуют');
-            createBaseCategories();
-        }
-    });
+    console.log('🔄 Создаем базовые таблицы...');
+    
+    // Только самые важные таблицы
+    db.run(`CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        username TEXT UNIQUE NOT NULL,
+        password TEXT NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`);
+    
+    db.run(`CREATE TABLE IF NOT EXISTS articles (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        title TEXT UNIQUE NOT NULL,
+        content TEXT NOT NULL,
+        author_id INTEGER,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`);
+    
+    console.log('✅ База инициализирована');
 }
 
-    // Начинаем создание таблиц
-    createTable(0);
-}
 
 // Middleware с 30-дневной сессией
 app.use(express.static('public'));
@@ -788,8 +676,10 @@ app.post('/logout', (req, res) => {
 });
 
 // Запуск сервера
+// Запуск сервера
 app.listen(PORT, () => {
     console.log('Щуропедия запущена на http://localhost:' + PORT);
     console.log('Используется SQLite база данных');
     console.log('Приложение готово к созданию статей пользователями');
 });
+
