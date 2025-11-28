@@ -93,6 +93,7 @@ db.runAsync = function(sql, params = []) {
 };
 
 function requireAuth(req, res, next) {
+    console.log('🔐 Проверка доступа:', req.session.user);
     if (req.session.user === 'admin') {
         next();
     } else {
@@ -104,7 +105,7 @@ function requireAdmin(req, res, next) {
     if (req.session.user === 'admin') {
         next();
     } else {
-        res.status(403).send('Доступ запрещен');
+        res.redirect('/admin');
     }
 }
 
@@ -624,14 +625,41 @@ app.post('/admin-login', (req, res) => {
     }
 });
 
-// Простая форма входа (добавь в главную страницу)
+// Админ вход
 app.get('/admin', (req, res) => {
     res.send(`
-        <form method="POST" action="/admin-login">
-            <input type="password" name="password" placeholder="Пароль админа">
-            <button>Войти</button>
-        </form>
+        <!DOCTYPE html>
+        <html>
+        <head><title>Вход админа</title></head>
+        <body>
+            <h2>Вход для админа</h2>
+            <form method="POST" action="/admin-login">
+                <input type="password" name="password" placeholder="Пароль админа" required>
+                <button>Войти</button>
+            </form>
+            <p>Пароль: щура123</p>
+        </body>
+        </html>
     `);
+});
+
+app.post('/admin-login', (req, res) => {
+    const { password } = req.body;
+    console.log('🔐 Попытка входа:', password);
+    
+    if (password === 'щура123') {
+        req.session.user = 'admin';
+        console.log('✅ Успешный вход!');
+        res.redirect('/');
+    } else {
+        console.log('❌ Неверный пароль');
+        res.send('Неверный пароль! Попробуй: щура123');
+    }
+});
+
+app.post('/logout', (req, res) => {
+    req.session.destroy();
+    res.redirect('/');
 });
 
 // Запуск сервера
