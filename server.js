@@ -3,7 +3,6 @@ const fs = require('fs').promises;
 const path = require('path');
 const { marked } = require('marked');
 const bcrypt = require('bcryptjs');
-const session = require('express-session');
 const sqlite3 = require('sqlite3').verbose();
 const PDFDocument = require('pdfkit');
 const session = require('express-session');
