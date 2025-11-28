@@ -618,46 +618,26 @@ app.get('/register', (req, res) => {
 
 app.post('/register', async (req, res) => {
     try {
-        console.log('🔧 Регистрация:', req.body);
-        
         const { username, password } = req.body;
-
-        //валидация
-        if (!username || !password) {
-            return res.render('register', { 
-                error: 'Заполните все поля',
-                user: req.session.user
-            });
-        }
-
-        if (password.length < 3) {
-            return res.render('register', { 
-                error: 'Пароль слишком короткий',
-                user: req.session.user
-            });
-        }
-
+        
         // Проверяем существование
         const existing = await db.getAsync('SELECT id FROM users WHERE username = ?', [username]);
         if (existing) {
-            return res.render('register', { 
-                error: 'Пользователь уже существует',
-                user: req.session.user
-            });
+            return res.send('Ошибка: Пользователь уже существует');
         }
 
-        // Сохраняем пароль в чистом виде
-        await db.runAsync(
-            'INSERT INTO users (username, password) VALUES (?, ?)',
-            [username, password]
-        );
-
-        console.log('Пользователь создан:', username);
+        // Сохраняем пароль как есть
+        await db.runAsync('INSERT INTO users (username, password) VALUES (?, ?)', [username, password]);
+        
+        // Устанавливаем сессию
         req.session.user = username;
-        res.redirect('/');
+        
+        // Простой редирект
+        return res.redirect('/');
+        
     } catch (error) {
-        console.error('ОШИБКА РЕГИСТРАЦИИ:', error);
-        res.status(500).send('Ошибка при регистрации: ' + error.message);
+        console.error('Ошибка:', error);
+        return res.send('Ошибка регистрации: ' + error.message);
     }
 });
 
@@ -668,33 +648,28 @@ app.get('/login', (req, res) => {
 
 app.post('/login', async (req, res) => {
     try {
-        console.log('🔧 Вход:', req.body);
-        
         const { username, password } = req.body;
 
         const user = await db.getAsync('SELECT * FROM users WHERE username = ?', [username]);
         
         if (!user) {
-            return res.render('login', { 
-                error: 'Пользователь не найден',
-                user: req.session.user
-            });
+            return res.send('Ошибка: Пользователь не найден');
         }
 
         // Простая проверка пароля
-        if (password === user.password) {
-            req.session.user = username;
-            return res.redirect('/');
+        if (password !== user.password) {
+            return res.send('Ошибка: Неверный пароль');
         }
 
-        return res.render('login', { 
-            error: 'Неверный пароль',
-            user: req.session.user
-        });
-
+        // Устанавливаем сессию
+        req.session.user = username;
+        
+        // Простой редирект
+        return res.redirect('/');
+        
     } catch (error) {
-        console.error('❌ ОШИБКА ВХОДА:', error);
-        res.status(500).send('Ошибка при входе: ' + error.message);
+        console.error('Ошибка:', error);
+        return res.send('Ошибка входа: ' + error.message);
     }
 });
 
