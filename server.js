@@ -6,6 +6,8 @@ const bcrypt = require('bcryptjs');
 const session = require('express-session');
 const sqlite3 = require('sqlite3').verbose();
 const PDFDocument = require('pdfkit');
+const session = require('express-session');
+const SQLiteStore = require('connect-sqlite3')(session);
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -49,8 +51,12 @@ app.use(express.static('public'));
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(session({
+    store: new SQLiteStore({
+        db: 'sessions.db',
+        dir: './'
+    }),
     secret: process.env.SESSION_SECRET || 'wiki-secret-key-2024',
-    resave: true,
+    resave: false,
     saveUninitialized: false,
     cookie: { 
         secure: process.env.NODE_ENV === 'production',
