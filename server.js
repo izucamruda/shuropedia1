@@ -93,18 +93,18 @@ db.runAsync = function(sql, params = []) {
 };
 
 function requireAuth(req, res, next) {
-    if (req.session.user) {
+    if (req.session.user === 'admin') {
         next();
     } else {
-        res.redirect('/login');
+        res.redirect('/admin');
     }
 }
 
 function requireAdmin(req, res, next) {
-    if (req.session.user === 'admin' || req.session.user === 'щура') {
+    if (req.session.user === 'admin') {
         next();
     } else {
-        res.status(403).send('Доступ запрещен. Требуются права администратора.');
+        res.status(403).send('Доступ запрещен');
     }
 }
 
@@ -612,71 +612,26 @@ app.post('/create', requireAuth, async (req, res) => {
     }
 });
 
-app.get('/register', (req, res) => {
-    res.render('register', { user: req.session.user });
-});
-
-app.post('/register', async (req, res) => {
-    try {
-        const { username, password } = req.body;
-        
-        // Проверяем существование
-        const existing = await db.getAsync('SELECT id FROM users WHERE username = ?', [username]);
-        if (existing) {
-            return res.send('Ошибка: Пользователь уже существует');
-        }
-
-        // Сохраняем пароль как есть
-        await db.runAsync('INSERT INTO users (username, password) VALUES (?, ?)', [username, password]);
-        
-        // Устанавливаем сессию
-        req.session.user = username;
-        
-        // Простой редирект
-        return res.redirect('/');
-        
-    } catch (error) {
-        console.error('Ошибка:', error);
-        return res.send('Ошибка регистрации: ' + error.message);
+// Простой вход для админа
+app.post('/admin-login', (req, res) => {
+    const { password } = req.body;
+    
+    if (password === 'щура123') { // любой простой пароль
+        req.session.user = 'admin';
+        res.redirect('/');
+    } else {
+        res.send('Неверный пароль');
     }
 });
 
-// Логин
-app.get('/login', (req, res) => {
-    res.render('login', { user: req.session.user });
-});
-
-app.post('/login', async (req, res) => {
-    try {
-        const { username, password } = req.body;
-
-        const user = await db.getAsync('SELECT * FROM users WHERE username = ?', [username]);
-        
-        if (!user) {
-            return res.send('Ошибка: Пользователь не найден');
-        }
-
-        // Простая проверка пароля
-        if (password !== user.password) {
-            return res.send('Ошибка: Неверный пароль');
-        }
-
-        // Устанавливаем сессию
-        req.session.user = username;
-        
-        // Простой редирект
-        return res.redirect('/');
-        
-    } catch (error) {
-        console.error('Ошибка:', error);
-        return res.send('Ошибка входа: ' + error.message);
-    }
-});
-
-// Выход
-app.post('/logout', (req, res) => {
-    req.session.destroy();
-    res.redirect('/');
+// Простая форма входа (добавь в главную страницу)
+app.get('/admin', (req, res) => {
+    res.send(`
+        <form method="POST" action="/admin-login">
+            <input type="password" name="password" placeholder="Пароль админа">
+            <button>Войти</button>
+        </form>
+    `);
 });
 
 // Запуск сервера
