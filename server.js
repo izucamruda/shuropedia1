@@ -186,8 +186,7 @@ app.post('/comment/:articleId', requireAuth, async (req, res) => {
     try {
         const articleId = req.params.articleId;
         const { content } = req.body;
-        const user = await db.getAsync('SELECT id FROM users WHERE username = ?', [req.session.user]);
-
+        const author_id = 1;
         await db.runAsync(
             'INSERT INTO comments (article_id, user_id, content) VALUES (?, ?, ?)',
             [articleId, user.id, content]
@@ -204,7 +203,7 @@ app.post('/comment/:articleId', requireAuth, async (req, res) => {
 app.post('/favorite/:articleId', requireAuth, async (req, res) => {
     try {
         const articleId = req.params.articleId;
-        const user = await db.getAsync('SELECT id FROM users WHERE username = ?', [req.session.user]);
+        const author_id = 1;
 
         // Проверяем нет ли уже в избранном
         const existing = await db.getAsync(
@@ -238,7 +237,7 @@ app.post('/flag/:articleId', requireAuth, async (req, res) => {
     try {
         const articleId = req.params.articleId;
         const { reason } = req.body;
-        const user = await db.getAsync('SELECT id FROM users WHERE username = ?', [req.session.user]);
+        const author_id = 1;
 
         await db.runAsync(
             'INSERT INTO flags (article_id, user_id, reason) VALUES (?, ?, ?)',
@@ -427,7 +426,7 @@ app.post('/save/:title', requireAuth, async (req, res) => {
     try {
         const title = req.params.title;
         const content = req.body.content;
-        const user = await db.getAsync('SELECT id FROM users WHERE username = ?', [req.session.user]);
+        const author_id = 1;
 
         const existingArticle = await db.getAsync('SELECT * FROM articles WHERE title = ?', [title]);
         
@@ -504,7 +503,7 @@ app.post('/restore/:history_id', requireAuth, async (req, res) => {
             return res.status(404).send('Версия не найдена');
         }
 
-        const user = await db.getAsync('SELECT id FROM users WHERE username = ?', [req.session.user]);
+        const author_id = 1;
         const currentArticle = await db.getAsync('SELECT * FROM articles WHERE id = ?', [history.article_id]);
         
         // Сохраняем текущую версию в историю
@@ -545,23 +544,21 @@ app.post('/delete/:title', requireAdmin, async (req, res) => {
     }
 });
 
-// Панель администратора
-app.get('/admin', requireAdmin, async (req, res) => {
+// Админ-панель
+app.get('/admin-panel', async (req, res) => {
+    if (req.session.user !== 'admin') {
+        return res.redirect('/admin');
+    }
+    
     try {
-        const articles = await db.allAsync(
-            'SELECT articles.*, users.username, (SELECT COUNT(*) FROM article_history WHERE article_id = articles.id) as history_count FROM articles LEFT JOIN users ON articles.author_id = users.id ORDER BY articles.updated_at DESC'
-        );
-        
-        const users = await db.allAsync('SELECT * FROM users ORDER BY created_at DESC');
-        
-        res.render('admin', {
+        const articles = await db.allAsync('SELECT * FROM articles ORDER BY updated_at DESC');
+        res.render('admin-panel', {
             articles: articles,
-            users: users,
             user: req.session.user
         });
     } catch (error) {
-        console.error('Ошибка загрузки админки:', error);
-        res.status(500).send('Ошибка при загрузке панели администратора');
+        console.error('Ошибка админки:', error);
+        res.status(500).send('Ошибка загрузки админки');
     }
 });
 
@@ -570,39 +567,29 @@ app.get('/create', requireAuth, (req, res) => {
     res.render('create', { user: req.session.user });
 });
 
-app.post('/create', requireAuth, async (req, res) => {
+app.post('/create', async (req, res) => {
     try {
-        const title = req.body.title;
-        const content = req.body.content || '# ' + title + '\n\nНачните писать вашу статью здесь...';
-        const user = await db.getAsync('SELECT id FROM users WHERE username = ?', [req.session.user]);
+        const { title, content } = req.body;
+        console.log('Создание статьи:', title);
         
-        // Проверяем существование статьи
-        const existing = await db.getAsync('SELECT id FROM articles WHERE title = ?', [title]);
-        if (existing) {
-            return res.render('create', { 
-                error: 'Статья с таким названием уже существует',
-                user: req.session.user
-            });
+        if (!title) {
+            return res.send('Введите название статьи');
         }
 
-        // Создаем статью
-        const result = await db.runAsync(
-            'INSERT INTO articles (title, content, author_id) VALUES (?, ?, ?)',
-            [title, content, user.id]
-        );
-
-        // Сохраняем в историю
         await db.runAsync(
-            'INSERT INTO article_history (article_id, content, author_id) VALUES (?, ?, ?)',
-            [result.id, content, user.id]
+            'INSERT INTO articles (title, content) VALUES (?, ?)',
+            [title, content || '# ' + title]
         );
 
+        console.log('Статья создана:', title);
         res.redirect(`/article/${title}`);
+        
     } catch (error) {
-        console.error('Ошибка:', error);
-        res.status(500).send('Ошибка при создании статьи');
+        console.error('Ошибка создания:', error);
+        res.send('Ошибка: ' + error.message);
     }
 });
+
 
 // Простой вход для админа
 app.post('/admin-login', (req, res) => {

@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Админ-панель - Щуропедия</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <header>
+        <h1><a href="/">Щуропедия</a></h1>
+        <div class="auth-links">
+            <span>Админ: <strong><%= user %></strong></span>
+            <form method="POST" action="/logout" style="display: inline;">
+                <button type="submit">Выйти</button>
+            </form>
+            <a href="/">На сайт</a>
+        </div>
+    </header>
+    <main>
+        <div class="admin-container">
+            <h2>🔧 Админ-панель</h2>
+            
+            <div class="admin-section">
+                <h3>📚 Все статьи (<%= articles.length %>)</h3>
+                <div class="articles-list">
+                    <% if (articles.length > 0) { %>
+                        <% articles.forEach(function(article) { %>
+                            <div class="article-item">
+                                <div class="article-info">
+                                    <strong><a href="/article/<%= article.title %>"><%= article.title %></a></strong>
+                                    <span>Создана: <%= new Date(article.created_at).toLocaleDateString() %></span>
+                                    <span>Просмотров: <%= article.views || 0 %></span>
+                                </div>
+                                <div class="article-actions">
+                                    <a href="/edit/<%= article.title %>" class="btn-edit">✏️ Редактировать</a>
+                                    <a href="/history/<%= article.title %>" class="btn-history">📜 История</a>
+                                    <form method="POST" action="/delete/<%= article.title %>" style="display: inline;">
+                                        <button type="submit" class="btn-delete" onclick="return confirm('Удалить «<%= article.title %>»?')">🗑️ Удалить</button>
+                                    </form>
+                                </div>
+                            </div>
+                        <% }); %>
+                    <% } else { %>
+                        <p>Статей пока нет</p>
+                    <% } %>
+                </div>
+            </div>
+
+            <div class="admin-section">
+                <h3>⚡ Быстрые действия</h3>
+                <div class="article-actions">
+                    <a href="/create" class="action-btn primary">📝 Создать статью</a>
+                    <a href="/categories" class="action-btn">📂 Категории</a>
+                    <a href="/" class="action-btn">🏠 На главную</a>
+                </div>
+            </div>
+        </div>
+    </main>
+</body>
+</html>
