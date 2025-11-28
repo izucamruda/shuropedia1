@@ -612,17 +612,28 @@ app.post('/create', requireAuth, async (req, res) => {
     }
 });
 
-// Регистрация
-app.get('/register', (req, res) => {
-    res.render('register', { user: req.session.user });
-});
-
 app.post('/register', async (req, res) => {
     try {
-        console.log('🔧 Регистрация:', req.body); // ДОБАВЬ ЭТУ СТРОКУ
+        console.log('🔧 Регистрация:', req.body);
         
         const { username, password } = req.body;
 
+        //валидация
+        if (!username || !password) {
+            return res.render('register', { 
+                error: 'Заполните все поля',
+                user: req.session.user
+            });
+        }
+
+        if (password.length < 3) {
+            return res.render('register', { 
+                error: 'Пароль слишком короткий',
+                user: req.session.user
+            });
+        }
+
+        // Проверяем существование
         const existing = await db.getAsync('SELECT id FROM users WHERE username = ?', [username]);
         if (existing) {
             return res.render('register', { 
@@ -631,16 +642,17 @@ app.post('/register', async (req, res) => {
             });
         }
 
-        const hashedPassword = await bcrypt.hash(password, 10);
+        // Сохраняем пароль в чистом виде
         await db.runAsync(
             'INSERT INTO users (username, password) VALUES (?, ?)',
-            [username, hashedPassword]
+            [username, password]
         );
 
+        console.log('Пользователь создан:', username);
         req.session.user = username;
         res.redirect('/');
     } catch (error) {
-        console.error('ОШИБКА РЕГИСТРАЦИИ:', error); // ДОБАВЬ ЭТУ СТРОКУ
+        console.error('ОШИБКА РЕГИСТРАЦИИ:', error);
         res.status(500).send('Ошибка при регистрации: ' + error.message);
     }
 });
@@ -665,31 +677,19 @@ app.post('/login', async (req, res) => {
             });
         }
 
-        console.log('Проверка пароля:', {
-            введенный: password,
-            в_базе: user.password,
-            длина_в_базе: user.password.length
-        });
-
-        // Временная проверка без хэширования:
+        // Простая проверка пароля
         if (password === user.password) {
             req.session.user = username;
             return res.redirect('/');
         }
 
-        const validPassword = await bcrypt.compare(password, user.password);
-        if (validPassword) {
-            req.session.user = username;
-            return res.redirect('/');
-        }
-
         return res.render('login', { 
-            error: 'Неверное имя пользователя или пароль',
+            error: 'Неверный пароль',
             user: req.session.user
         });
 
     } catch (error) {
-        console.error('ОШИБКА ВХОДА:', error);
+        console.error('❌ ОШИБКА ВХОДА:', error);
         res.status(500).send('Ошибка при входе: ' + error.message);
     }
 });
@@ -700,7 +700,6 @@ app.post('/logout', (req, res) => {
     res.redirect('/');
 });
 
-// Запуск сервера
 // Запуск сервера
 app.listen(PORT, () => {
     console.log('Щуропедия запущена на http://localhost:' + PORT);
