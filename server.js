@@ -612,6 +612,10 @@ app.post('/create', requireAuth, async (req, res) => {
     }
 });
 
+app.get('/register', (req, res) => {
+    res.render('register', { user: req.session.user });
+});
+
 app.post('/register', async (req, res) => {
     try {
         console.log('🔧 Регистрация:', req.body);
