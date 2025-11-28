@@ -22,9 +22,7 @@ const db = new sqlite3.Database(path.join(__dirname, 'wiki.db'), (err) => {
 });
 
 function initDatabase() {
-    console.log('🔄 Создаем базовые таблицы...');
-    
-    // Только самые важные таблицы
+    console.log('Создаем базовые таблицы...');
     db.run(`CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         username TEXT UNIQUE NOT NULL,
@@ -654,22 +652,44 @@ app.get('/login', (req, res) => {
 
 app.post('/login', async (req, res) => {
     try {
-        console.log('🔧 Вход:', req.body); // ДОБАВЬ ЭТУ СТРОКУ
+        console.log('🔧 Вход:', req.body);
         
         const { username, password } = req.body;
 
         const user = await db.getAsync('SELECT * FROM users WHERE username = ?', [username]);
-        if (!user || !(await bcrypt.compare(password, user.password))) {
+        
+        if (!user) {
             return res.render('login', { 
-                error: 'Неверное имя пользователя или пароль',
+                error: 'Пользователь не найден',
                 user: req.session.user
             });
         }
 
-        req.session.user = username;
-        res.redirect('/');
+        console.log('Проверка пароля:', {
+            введенный: password,
+            в_базе: user.password,
+            длина_в_базе: user.password.length
+        });
+
+        // Временная проверка без хэширования:
+        if (password === user.password) {
+            req.session.user = username;
+            return res.redirect('/');
+        }
+
+        const validPassword = await bcrypt.compare(password, user.password);
+        if (validPassword) {
+            req.session.user = username;
+            return res.redirect('/');
+        }
+
+        return res.render('login', { 
+            error: 'Неверное имя пользователя или пароль',
+            user: req.session.user
+        });
+
     } catch (error) {
-        console.error('ОШИБКА ВХОДА:', error); // ДОБАВЬ ЭТУ СТРОКУ
+        console.error('ОШИБКА ВХОДА:', error);
         res.status(500).send('Ошибка при входе: ' + error.message);
     }
 });
