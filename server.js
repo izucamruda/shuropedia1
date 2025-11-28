@@ -93,20 +93,11 @@ db.runAsync = function(sql, params = []) {
 };
 
 function requireAuth(req, res, next) {
-    console.log('🔐 Проверка доступа:', req.session.user);
-    if (req.session.user === 'admin') {
-        next();
-    } else {
-        res.redirect('/admin');
-    }
+    next(); // Разрешить всем
 }
 
 function requireAdmin(req, res, next) {
-    if (req.session.user === 'admin') {
-        next();
-    } else {
-        res.redirect('/admin');
-    }
+    next(); // Разрешить всем
 }
 
 // ПОИСК ПО СОДЕРЖИМОМУ
