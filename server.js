@@ -48,16 +48,16 @@ app.use(express.static('public'));
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(session({
-    store: new SQLiteStore({
+    store: new (require('connect-sqlite3')(session))({
         db: 'sessions.db',
         dir: './'
     }),
-    secret: process.env.SESSION_SECRET || 'wiki-secret-key-2024',
+    secret: 'wiki-secret-key-2024',
     resave: false,
     saveUninitialized: false,
     cookie: { 
-        secure: process.env.NODE_ENV === 'production',
-        maxAge: 30 * 24 * 60 * 60 * 1000 // 30 ДНЕЙ!
+        secure: false,
+        maxAge: 7 * 24 * 60 * 60 * 1000 // 7 дней
     }
 }));
 

@@ -10,52 +10,111 @@
     <header>
         <h1><a href="/">Щуропедия</a></h1>
         <div class="auth-links">
-            <span>Админ: <strong><%= user %></strong></span>
+            <span>🔧 Админ: <strong><%= user %></strong></span>
             <form method="POST" action="/logout" style="display: inline;">
-                <button type="submit">Выйти</button>
+                <button type="submit" style="background: #dc3545;">🚪 Выйти</button>
             </form>
-            <a href="/">На сайт</a>
+            <a href="/" style="background: #6c757d; color: white; padding: 0.5rem 1rem; border-radius: 6px; text-decoration: none;">🏠 На сайт</a>
         </div>
     </header>
     <main>
-        <div class="admin-container">
-            <h2>🔧 Админ-панель</h2>
+        <div class="admin-panel-container">
+            <h2>🔧 Панель управления Щуропедией</h2>
             
+            <!-- Статистика -->
+            <div class="admin-stats">
+                <div class="stat-card">
+                    <span class="stat-number"><%= articles.length %></span>
+                    <span class="stat-label">Всего статей</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-number"><%= articles.filter(a => a.views > 0).length %></span>
+                    <span class="stat-label">Просматриваемых</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-number"><%= new Date().toLocaleDateString() %></span>
+                    <span class="stat-label">Сегодня</span>
+                </div>
+            </div>
+
+            <!-- Быстрые действия -->
+            <div class="admin-section">
+                <h3>⚡ Быстрые действия</h3>
+                <div class="admin-actions">
+                    <a href="/create" class="admin-btn">📝 Создать статью</a>
+                    <a href="/categories" class="admin-btn">📂 Управление категориями</a>
+                    <a href="/" class="admin-btn">👁️ Просмотреть сайт</a>
+                </div>
+            </div>
+
+            <!-- Все статьи -->
             <div class="admin-section">
                 <h3>📚 Все статьи (<%= articles.length %>)</h3>
-                <div class="articles-list">
-                    <% if (articles.length > 0) { %>
+                <% if (articles.length > 0) { %>
+                    <div class="articles-list">
                         <% articles.forEach(function(article) { %>
-                            <div class="article-item">
+                            <div class="article-item" style="background: white; padding: 1.5rem; margin: 1rem 0; border-radius: 8px; border-left: 4px solid #36c;">
                                 <div class="article-info">
-                                    <strong><a href="/article/<%= article.title %>"><%= article.title %></a></strong>
-                                    <span>Создана: <%= new Date(article.created_at).toLocaleDateString() %></span>
-                                    <span>Просмотров: <%= article.views || 0 %></span>
+                                    <strong style="font-size: 1.2rem;">
+                                        <a href="/article/<%= article.title %>" style="color: #36c; text-decoration: none;">
+                                            <%= article.title %>
+                                        </a>
+                                    </strong>
+                                    <div style="margin-top: 0.5rem; color: #666;">
+                                        <span>📅 <%= new Date(article.created_at).toLocaleDateString() %></span>
+                                        <span> | 👁️ <%= article.views || 0 %> просмотров</span>
+                                        <span> | 🔄 <%= new Date(article.updated_at).toLocaleDateString() %></span>
+                                    </div>
                                 </div>
-                                <div class="article-actions">
-                                    <a href="/edit/<%= article.title %>" class="btn-edit">✏️ Редактировать</a>
-                                    <a href="/history/<%= article.title %>" class="btn-history">📜 История</a>
+                                <div class="article-actions" style="margin-top: 1rem; display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                                    <a href="/edit/<%= article.title %>" class="admin-btn" style="padding: 0.5rem 1rem; font-size: 0.9rem;">✏️ Редактировать</a>
+                                    <a href="/history/<%= article.title %>" class="admin-btn" style="padding: 0.5rem 1rem; font-size: 0.9rem; background: #6c757d;">📜 История</a>
                                     <form method="POST" action="/delete/<%= article.title %>" style="display: inline;">
-                                        <button type="submit" class="btn-delete" onclick="return confirm('Удалить «<%= article.title %>»?')">🗑️ Удалить</button>
+                                        <button type="submit" class="admin-btn danger" style="padding: 0.5rem 1rem; font-size: 0.9rem;" 
+                                                onclick="return confirm('Точно удалить статью «<%= article.title %>»?')">
+                                            🗑️ Удалить
+                                        </button>
                                     </form>
                                 </div>
                             </div>
                         <% }); %>
-                    <% } else { %>
-                        <p>Статей пока нет</p>
-                    <% } %>
-                </div>
+                    </div>
+                <% } else { %>
+                    <div style="text-align: center; padding: 3rem; color: #666;">
+                        <p style="font-size: 1.2rem;">📭 Статей пока нет</p>
+                        <a href="/create" class="admin-btn" style="display: inline-block; margin-top: 1rem;">Создать первую статью</a>
+                    </div>
+                <% } %>
             </div>
 
+            <!-- Системная информация -->
             <div class="admin-section">
-                <h3>⚡ Быстрые действия</h3>
-                <div class="article-actions">
-                    <a href="/create" class="action-btn primary">📝 Создать статью</a>
-                    <a href="/categories" class="action-btn">📂 Категории</a>
-                    <a href="/" class="action-btn">🏠 На главную</a>
+                <h3>🖥️ Системная информация</h3>
+                <div style="background: white; padding: 1.5rem; border-radius: 8px;">
+                    <p><strong>База данных:</strong> SQLite</p>
+                    <p><strong>Статей в базе:</strong> <%= articles.length %></p>
+                    <p><strong>Последнее обновление:</strong> <%= new Date().toLocaleString() %></p>
                 </div>
             </div>
         </div>
     </main>
+
+    <div class="theme-switcher">
+        <button class="theme-toggle" onclick="toggleTheme()">🌙</button>
+    </div>
+
+    <script>
+    function toggleTheme() {
+        document.body.classList.toggle('dark-theme');
+        const isDark = document.body.classList.contains('dark-theme');
+        localStorage.setItem('darkTheme', isDark);
+        document.querySelector('.theme-toggle').textContent = isDark ? '☀️' : '🌙';
+    }
+
+    if (localStorage.getItem('darkTheme') === 'true') {
+        document.body.classList.add('dark-theme');
+        document.querySelector('.theme-toggle').textContent = '☀️';
+    }
+    </script>
 </body>
 </html>

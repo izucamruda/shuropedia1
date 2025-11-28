@@ -13,8 +13,17 @@
             <input type="text" name="q" value="<%= query %>" placeholder="Поиск по статьям...">
             <button type="submit">🔍</button>
         </form>
-        <div class="auth-links">
-            <!-- auth links как в других шаблонах -->
+		 <div class="auth-links">
+         <% if (user === 'admin') { %>
+    <span>Админ: <strong><%= user %></strong></span>
+    <a href="/admin-panel">🔧 Панель</a>
+    <form method="POST" action="/logout" style="display: inline;">
+        <button type="submit">Выйти</button>
+    </form>
+    <a href="/create">Создать статью</a>
+<% } else { %>
+    <a href="/admin">🔐 Вход админа</a>
+<% } %>
         </div>
     </header>
 

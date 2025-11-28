@@ -15,7 +15,9 @@
                 <form method="POST" action="/logout" style="display: inline;">
                     <button type="submit">Выйти</button>
                 </form>
-            </span>
+				<% } else { %>
+    <a href="/admin">🔐 Вход админа</a>
+<% } %>
         </div>
     </header>
     <main>

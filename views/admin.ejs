@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Вход - Щуропедия</title>
+    <title>Вход админа - Щуропедия</title>
     <link rel="stylesheet" href="/style.css">
 </head>
 <body>
@@ -14,12 +14,13 @@
         </div>
     </header>
     <main>
-        <div class="auth-container">
-            <h2>Вход для редактирования</h2>
+        <div class="admin-login-container">
+            <h2>Вход для админа</h2>
             <form method="POST" action="/admin-login">
-                <input type="password" name="password" placeholder="Пароль админа" required>
-                <button type="submit">Войти</button>
+                <input type="password" name="password" placeholder="Введите пароль админа" required>
+                <button type="submit" class="admin-btn" style="width: 100%;">Войти</button>
             </form>
+            <p class="password-hint">Пароль: щура123</p>
         </div>
     </main>
 </body>
