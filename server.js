@@ -499,12 +499,6 @@ app.post('/save/:title', requireAuth, async (req, res) => {
     }
 });
 
-        res.redirect(`/article/${title}`);
-    } catch (error) {
-        console.error('Ошибка:', error);
-        res.status(500).send('Ошибка при сохранении статьи');
-    }
-});
 
 // История статьи
 app.get('/history/:title', async (req, res) => {
