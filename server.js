@@ -11,6 +11,50 @@ const SQLiteStore = require('connect-sqlite3')(session);
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+const ARTICLES_BACKUP_DIR = './articles_backup';
+
+// Сохраняем статью в бэкап
+async function backupArticle(title, content) {
+    try {
+        const filename = `${title.replace(/[^a-z0-9а-яё]/gi, '_')}.md`;
+        const filepath = path.join(ARTICLES_BACKUP_DIR, filename);
+        await fs.writeFile(filepath, content, 'utf8');
+        console.log('💾 Статья сохранена в бэкап:', filename);
+    } catch (error) {
+        console.error('❌ Ошибка бэкапа:', error);
+    }
+}
+
+// Восстанавливаем статьи из бэкапа при запуске
+async function restoreFromBackup() {
+    try {
+        const files = await fs.readdir(ARTICLES_BACKUP_DIR);
+        let restoredCount = 0;
+        
+        for (const file of files) {
+            if (file.endsWith('.md')) {
+                const filepath = path.join(ARTICLES_BACKUP_DIR, file);
+                const content = await fs.readFile(filepath, 'utf8');
+                const title = file.replace('.md', '').replace(/_/g, ' ');
+                
+                // Проверяем есть ли статья в БД
+                const existing = await db.getAsync('SELECT id FROM articles WHERE title = ?', [title]);
+                if (!existing) {
+                    await db.runAsync(
+                        'INSERT OR IGNORE INTO articles (title, content) VALUES (?, ?)',
+                        [title, content]
+                    );
+                    restoredCount++;
+                    console.log('🔄 Восстановлена статья:', title);
+                }
+            }
+        }
+        console.log(`✅ Восстановлено статей из бэкапа: ${restoredCount}`);
+    } catch (error) {
+        console.error('❌ Ошибка восстановления:', error);
+    }
+}
+
 // Инициализация базы данных
 const db = new sqlite3.Database(path.join(__dirname, 'wiki.db'), (err) => {
     if (err) {
@@ -40,6 +84,9 @@ function initDatabase() {
     )`);
     
     console.log('✅ База инициализирована');
+    
+    // Восстанавливаем статьи из бэкапа
+    restoreFromBackup();
 }
 
 
@@ -448,6 +495,8 @@ app.post('/save/:title', requireAuth, async (req, res) => {
                 'INSERT INTO articles (title, content, author_id) VALUES (?, ?, ?)',
                 [title, content, user.id]
             );
+			
+			await backupArticle(title, content);
             
             // Сохраняем в историю
             await db.runAsync(
@@ -580,6 +629,8 @@ app.post('/create', async (req, res) => {
             'INSERT INTO articles (title, content) VALUES (?, ?)',
             [title, content || '# ' + title]
         );
+		
+        await backupArticle(title, articleContent);
 
         console.log('Статья создана:', title);
         res.redirect(`/article/${title}`);
