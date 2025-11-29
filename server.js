@@ -233,10 +233,11 @@ app.post('/comment/:articleId', requireAuth, async (req, res) => {
     try {
         const articleId = req.params.articleId;
         const { content } = req.body;
-        const author_id = 1;
+        const author_id = 1; // ЗАМЕНИ user.id на это
+        
         await db.runAsync(
             'INSERT INTO comments (article_id, user_id, content) VALUES (?, ?, ?)',
-            [articleId, user.id, content]
+            [articleId, author_id, content] // ЗДЕСЬ
         );
 
         res.redirect(`/article/${req.body.articleTitle}`);
@@ -250,25 +251,22 @@ app.post('/comment/:articleId', requireAuth, async (req, res) => {
 app.post('/favorite/:articleId', requireAuth, async (req, res) => {
     try {
         const articleId = req.params.articleId;
-        const author_id = 1;
+        const author_id = 1; // ЗАМЕНИ user.id на это
 
-        // Проверяем нет ли уже в избранном
         const existing = await db.getAsync(
             'SELECT id FROM favorites WHERE user_id = ? AND article_id = ?',
-            [user.id, articleId]
+            [author_id, articleId] // ЗДЕСЬ
         );
 
         if (existing) {
-            // Удаляем из избранного
             await db.runAsync(
                 'DELETE FROM favorites WHERE user_id = ? AND article_id = ?',
-                [user.id, articleId]
+                [author_id, articleId] // ЗДЕСЬ
             );
         } else {
-            // Добавляем в избранное
             await db.runAsync(
                 'INSERT INTO favorites (user_id, article_id) VALUES (?, ?)',
-                [user.id, articleId]
+                [author_id, articleId] // ЗДЕСЬ
             );
         }
 
@@ -284,11 +282,11 @@ app.post('/flag/:articleId', requireAuth, async (req, res) => {
     try {
         const articleId = req.params.articleId;
         const { reason } = req.body;
-        const author_id = 1;
+        const author_id = 1; // ЗАМЕНИ user.id на это
 
         await db.runAsync(
             'INSERT INTO flags (article_id, user_id, reason) VALUES (?, ?, ?)',
-            [articleId, user.id, reason]
+            [articleId, author_id, reason] // ЗДЕСЬ
         );
 
         res.redirect(`/article/${req.body.articleTitle}?flagged=true`);
@@ -473,37 +471,33 @@ app.post('/save/:title', requireAuth, async (req, res) => {
     try {
         const title = req.params.title;
         const content = req.body.content;
-        const author_id = 1;
+        const author_id = 1; // Временное решение
 
         const existingArticle = await db.getAsync('SELECT * FROM articles WHERE title = ?', [title]);
         
         if (existingArticle) {
-            // Сохраняем в историю предыдущую версию
+            // Обновляем статью БЕЗ user.id
             await db.runAsync(
-                'INSERT INTO article_history (article_id, content, author_id) VALUES (?, ?, ?)',
-                [existingArticle.id, existingArticle.content, user.id]
-            );
-            
-            // Обновляем статью
-            await db.runAsync(
-                'UPDATE articles SET content = ?, author_id = ?, updated_at = CURRENT_TIMESTAMP WHERE title = ?',
-                [content, user.id, title]
+                'UPDATE articles SET content = ?, updated_at = CURRENT_TIMESTAMP WHERE title = ?',
+                [content, title]
             );
         } else {
-            // Создаем новую статью
-            const result = await db.runAsync(
-                'INSERT INTO articles (title, content, author_id) VALUES (?, ?, ?)',
-                [title, content, user.id]
-            );
-			
-			await backupArticle(title, content);
-            
-            // Сохраняем в историю
+            // Создаем новую статью БЕЗ user.id
             await db.runAsync(
-                'INSERT INTO article_history (article_id, content, author_id) VALUES (?, ?, ?)',
-                [result.id, content, user.id]
+                'INSERT INTO articles (title, content, author_id) VALUES (?, ?, ?)',
+                [title, content, author_id]
             );
         }
+
+        // Сохраняем в бэкап
+        await backupArticle(title, content);
+
+        res.redirect(`/article/${title}`);
+    } catch (error) {
+        console.error('Ошибка:', error);
+        res.status(500).send('Ошибка при сохранении статьи');
+    }
+});
 
         res.redirect(`/article/${title}`);
     } catch (error) {
@@ -612,10 +606,6 @@ app.get('/admin-panel', async (req, res) => {
 });
 
 // Создание новой статьи
-app.get('/create', requireAuth, (req, res) => {
-    res.render('create', { user: req.session.user });
-});
-
 app.post('/create', async (req, res) => {
     try {
         const { title, content } = req.body;
@@ -625,14 +615,18 @@ app.post('/create', async (req, res) => {
             return res.send('Введите название статьи');
         }
 
+        const articleContent = content || '# ' + title;
+        
+        // Сохраняем в БД
         await db.runAsync(
             'INSERT INTO articles (title, content) VALUES (?, ?)',
-            [title, content || '# ' + title]
+            [title, articleContent]
         );
-		
+
+        // ✅ Сохраняем в бэкап
         await backupArticle(title, articleContent);
 
-        console.log('Статья создана:', title);
+        console.log('✅ Статья создана и сохранена в бэкап:', title);
         res.redirect(`/article/${title}`);
         
     } catch (error) {
@@ -640,7 +634,6 @@ app.post('/create', async (req, res) => {
         res.send('Ошибка: ' + error.message);
     }
 });
-
 
 // Простой вход для админа
 app.post('/admin-login', (req, res) => {
