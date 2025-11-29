@@ -29,6 +29,8 @@ async function backupArticle(title, content) {
 async function restoreFromBackup() {
     try {
         const files = await fs.readdir(ARTICLES_BACKUP_DIR);
+        console.log(`📁 Найдено файлов в бэкапе: ${files.length}`);
+        
         let restoredCount = 0;
         
         for (const file of files) {
@@ -37,15 +39,20 @@ async function restoreFromBackup() {
                 const content = await fs.readFile(filepath, 'utf8');
                 const title = file.replace('.md', '').replace(/_/g, ' ');
                 
+                console.log(`🔍 Проверяем статью: "${title}"`);
+                
                 // Проверяем есть ли статья в БД
                 const existing = await db.getAsync('SELECT id FROM articles WHERE title = ?', [title]);
+                
                 if (!existing) {
+                    console.log(`➕ Добавляем статью: "${title}"`);
                     await db.runAsync(
                         'INSERT OR IGNORE INTO articles (title, content) VALUES (?, ?)',
                         [title, content]
                     );
                     restoredCount++;
-                    console.log('🔄 Восстановлена статья:', title);
+                } else {
+                    console.log(`⏩ Статья уже существует: "${title}"`);
                 }
             }
         }
@@ -56,39 +63,50 @@ async function restoreFromBackup() {
 }
 
 // Инициализация базы данных
-const db = new sqlite3.Database(path.join(__dirname, 'wiki.db'), (err) => {
+const db = new sqlite3.Database(path.join(__dirname, 'wiki.db'), async (err) => {
     if (err) {
         console.error('Ошибка подключения к БД:', err);
     } else {
         console.log('✅ Подключен к SQLite базе данных');
-        initDatabase();
+        await initDatabase(); // ← Только эта строка
     }
 });
 
-function initDatabase() {
+async function initDatabase() {
     console.log('Создаем базовые таблицы...');
-    db.run(`CREATE TABLE IF NOT EXISTS users (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        username TEXT UNIQUE NOT NULL,
-        password TEXT NOT NULL,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )`);
     
-    db.run(`CREATE TABLE IF NOT EXISTS articles (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        title TEXT UNIQUE NOT NULL,
-        content TEXT NOT NULL,
-        author_id INTEGER,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )`);
+    // 1. Сначала создаем таблицы
+    await new Promise((resolve, reject) => {
+        db.run(`CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE NOT NULL,
+            password TEXT NOT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )`, (err) => {
+            if (err) reject(err);
+            else resolve();
+        });
+    });
+    
+    await new Promise((resolve, reject) => {
+        db.run(`CREATE TABLE IF NOT EXISTS articles (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT UNIQUE NOT NULL,
+            content TEXT NOT NULL,
+            author_id INTEGER,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )`, (err) => {
+            if (err) reject(err);
+            else resolve();
+        });
+    });
     
     console.log('✅ База инициализирована');
     
-    // Восстанавливаем статьи из бэкапа
-    restoreFromBackup();
+    // 2. Теперь восстанавливаем статьи
+    await restoreFromBackup();
 }
-
 
 // Middleware с 30-дневной сессией
 app.use(express.static('public'));
@@ -361,13 +379,13 @@ app.get('/', async (req, res) => {
         `);
 
         // Получаем популярные статьи (по просмотрам)
-        const popularArticles = await db.allAsync(`
-            SELECT a.*, u.username 
-            FROM articles a 
-            LEFT JOIN users u ON a.author_id = u.id 
-            ORDER BY a.views DESC 
-            LIMIT 5
-        `);
+       const popularArticles = await db.allAsync(`
+    SELECT a.*, u.username 
+    FROM articles a 
+    LEFT JOIN users u ON a.author_id = u.id 
+    ORDER BY a.updated_at DESC 
+    LIMIT 5
+`);
 
         // Получаем случайную статью
         const randomArticle = await db.getAsync(`
@@ -412,12 +430,6 @@ app.get('/article/:title', async (req, res) => {
 
         if (article) {
             console.log('Статья найдена в БД');
-            
-            // Увеличиваем счетчик просмотров
-            await db.runAsync(
-                'UPDATE articles SET views = views + 1 WHERE id = ?',
-                [article.id]
-            );
             
             const content = marked(article.content);
             return res.render('article', { 
@@ -680,6 +692,24 @@ app.post('/admin-login', (req, res) => {
 app.post('/logout', (req, res) => {
     req.session.destroy();
     res.redirect('/');
+});
+
+app.post('/reset-database', async (req, res) => {
+    try {
+        // Закрываем текущее соединение
+        db.close();
+        
+        // Удаляем файл БД
+        await fs.unlink('./wiki.db').catch(() => {});
+        await fs.unlink('./sessions.db').catch(() => {});
+        
+        console.log('🗑️ База данных удалена');
+        res.send('База данных удалена. Перезапусти сервер.');
+        
+    } catch (error) {
+        console.error('Ошибка сброса:', error);
+        res.send('Ошибка: ' + error.message);
+    }
 });
 
 // Запуск сервера
