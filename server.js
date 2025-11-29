@@ -600,6 +600,10 @@ app.get('/admin-panel', async (req, res) => {
 });
 
 // Создание новой статьи
+app.get('/create', requireAuth, (req, res) => {
+    res.render('create', { user: req.session.user });
+});
+
 app.post('/create', async (req, res) => {
     try {
         const { title, content } = req.body;
