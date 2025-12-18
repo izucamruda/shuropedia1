@@ -44,6 +44,16 @@
     <% } %>
 </div>
 
+<div class="reading-progress" style="margin: 1rem 0 2rem 0;">
+    <div class="progress-bar" id="progressBar" style="height: 6px; background: #e0e0e0; border-radius: 3px; overflow: hidden;">
+        <div id="progressFill" style="height: 100%; width: 0%; background: linear-gradient(90deg, #36c, #2a5); transition: width 0.3s;"></div>
+    </div>
+    <div style="display: flex; justify-content: space-between; margin-top: 0.5rem; font-size: 0.9rem; color: #666;">
+        <span id="progressText">0% прочитано</span>
+        <span id="readingTime">Примерное время чтения: <span id="timeValue">2 мин</span></span>
+    </div>
+</div>
+
 <!-- ДОБАВЬ блок комментариев: -->
 <div class="comments-section">
     <h3>💬 Комментарии</h3>
@@ -59,5 +69,74 @@
     <!-- Здесь будут комментарии -->
 </div>
     </main>
+<script>
+// Прогресс-бар чтения статьи
+document.addEventListener('DOMContentLoaded', function() {
+    const articleContent = document.querySelector('.content');
+    const progressFill = document.getElementById('progressFill');
+    const progressText = document.getElementById('progressText');
+    const timeValue = document.getElementById('timeValue');
+    
+    if (!articleContent) return;
+    
+    // Рассчитываем время чтения
+    const text = articleContent.textContent || articleContent.innerText;
+    const wordCount = text.split(/\s+/).length;
+    const readingTimeMinutes = Math.ceil(wordCount / 200); // 200 слов в минуту
+    timeValue.textContent = `${readingTimeMinutes} мин`;
+    
+    // Обновляем прогресс при прокрутке
+    function updateProgress() {
+        const articleHeight = articleContent.offsetHeight;
+        const windowHeight = window.innerHeight;
+        const scrollPosition = window.scrollY;
+        const windowBottom = scrollPosition + windowHeight;
+        
+        // Начало и конец статьи
+        const articleTop = articleContent.offsetTop;
+        const articleBottom = articleTop + articleHeight;
+        
+        // Сколько статьи уже прокручено
+        let visibleHeight = 0;
+        
+        if (scrollPosition <= articleTop) {
+            // Еще не дошли до статьи
+            visibleHeight = 0;
+        } else if (windowBottom >= articleBottom) {
+            // Прочитали всю статью
+            visibleHeight = articleHeight;
+        } else {
+            // Часть статьи видна
+            visibleHeight = windowBottom - articleTop;
+        }
+        
+        // Ограничиваем от 0 до 100%
+        const progress = Math.min(100, Math.max(0, (visibleHeight / articleHeight) * 100));
+        
+        // Обновляем прогресс-бар
+        progressFill.style.width = progress + '%';
+        progressText.textContent = Math.round(progress) + '% прочитано';
+        
+        // Меняем цвет при 100%
+        if (progress >= 100) {
+            progressFill.style.background = 'linear-gradient(90deg, #28a745, #20c997)';
+        } else {
+            progressFill.style.background = 'linear-gradient(90deg, #36c, #2a5)';
+        }
+    }
+    
+    // Обновляем прогресс при прокрутке
+    window.addEventListener('scroll', updateProgress);
+    window.addEventListener('resize', updateProgress);
+    
+    // Инициализируем
+    updateProgress();
+    
+    // Анимация появления прогресс-бара
+    setTimeout(() => {
+        progressFill.style.transition = 'width 0.5s ease';
+    }, 100);
+});
+</script>
 </body>
 </html>
