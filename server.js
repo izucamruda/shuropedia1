@@ -13,6 +13,105 @@ const ARTICLES_BACKUP_DIR = './articles_backup';
 let currentRandomArticle = null;
 let lastRandomUpdate = null;
 
+// ==== НАСТРОЙКИ GITHUB ==== // НОВОЕ
+const GITHUB_OWNER = process.env.GITHUB_OWNER; // Берем из настроек Render
+const GITHUB_REPO = process.env.GITHUB_REPO;   // Берем из настроек Render
+const GITHUB_PATH = 'articles_backup/'; // Папка в репо для статей
+
+let octokit; // Объявляем переменную
+if (process.env.GITHUB_TOKEN) {
+  octokit = new Octokit({ auth: process.env.GITHUB_TOKEN }); // Создаем клиент, если токен есть
+  console.log('🔑 GitHub клиент инициализирован.');
+} else {
+  console.log('⚠️  GITHUB_TOKEN не задан. Сохранение в GitHub отключено.');
+}
+
+// ==== ФУНКЦИЯ СОХРАНЕНИЯ В GITHUB ==== // НОВОЕ
+async function saveArticleToGitHub(title, content) {
+  // Если клиента GitHub нет (например, локально) - пропускаем
+  if (!octokit) {
+    console.log(`⚠️  Пропускаем сохранение "${title}" в GitHub (режим без токена).`);
+    return true;
+  }
+
+  try {
+    const filename = `${title.replace(/[^a-z0-9а-яё]/gi, '_')}.md`;
+    const filePath = `${GITHUB_PATH}${filename}`;
+    const message = `📝 ${title}`;
+    const contentBase64 = Buffer.from(content).toString('base64');
+
+    let sha = null;
+    try {
+      // Пытаемся получить файл, если он уже существует
+      const { data } = await octokit.repos.getContent({
+        owner: GITHUB_OWNER, repo: GITHUB_REPO, path: filePath
+      });
+      sha = data.sha; // Запоминаем ID существующего файла для его обновления
+      console.log(`✏️  Статья "${title}" найдена на GitHub, обновляем...`);
+    } catch (error) {
+      // Если файла нет (ошибка 404) - это нормально, создадим новый
+      console.log(`🆕 Статья "${title}" не найдена, создаем...`);
+    }
+
+    // Создаем или обновляем файл на GitHub
+    await octokit.repos.createOrUpdateFileContents({
+      owner: GITHUB_OWNER, repo: GITHUB_REPO, path: filePath,
+      message: message, content: contentBase64, sha: sha
+    });
+
+    console.log(`✅ Статья "${title}" успешно сохранена в GitHub.`);
+    return true;
+  } catch (error) {
+    console.error(`❌ Ошибка при сохранении в GitHub:`, error.message);
+    return false;
+  }
+}
+
+// ==== ФУНКЦИЯ ЗАГРУЗКИ ИЗ GITHUB ПРИ СТАРТЕ ==== // НОВОЕ
+async function restoreArticlesFromGitHub() {
+  console.log('🌐 Попытка загрузки статей из GitHub...');
+  
+  if (!octokit) {
+    console.log('⚠️  GitHub клиент не активен. Загружаем статьи из локальной папки.');
+    await restoreFromBackup();
+    return;
+  }
+
+  try {
+    // Получаем список файлов в папке GITHUB_PATH на GitHub
+    const { data } = await octokit.repos.getContent({
+      owner: GITHUB_OWNER, repo: GITHUB_REPO, path: GITHUB_PATH
+    });
+
+    for (const item of data) {
+      if (item.name.endsWith('.md')) {
+        const title = item.name.replace('.md', '').replace(/_/g, ' ');
+
+        // Скачиваем каждый .md файл
+        const { data: fileData } = await octokit.repos.getContent({
+          owner: GITHUB_OWNER, repo: GITHUB_REPO, path: item.path
+        });
+        const content = Buffer.from(fileData.content, 'base64').toString('utf8');
+
+        // Сохраняем в локальную базу SQLite
+        const existing = await db.getAsync('SELECT id FROM articles WHERE title = ?', [title]);
+        if (!existing) {
+          await db.runAsync(
+            'INSERT OR IGNORE INTO articles (title, content) VALUES (?, ?)',
+            [title, content]
+          );
+          console.log(`➕ Загружена из GitHub: "${title}"`);
+        }
+      }
+    }
+    console.log('✅ Загрузка из GitHub завершена.');
+  } catch (error) {
+    console.error('❌ Не удалось загрузить из GitHub:', error.message);
+    console.log('🔄 Загружаем из локальной папки бэкапов...');
+    await restoreFromBackup(); // Запасной вариант
+  }
+}
+
 // Сохраняем статью в бэкап
 async function backupArticle(title, content) {
     try {
