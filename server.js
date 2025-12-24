@@ -6,6 +6,9 @@ const sqlite3 = require('sqlite3').verbose();
 const PDFDocument = require('pdfkit');
 const session = require('express-session');
 
+// ==== ИМПОРТ OCTOKIT (ВАЖНО: ДОБАВЬ ЭТУ СТРОЧКУ!) ====
+const { Octokit } = require('@octokit/rest');
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -13,14 +16,14 @@ const ARTICLES_BACKUP_DIR = './articles_backup';
 let currentRandomArticle = null;
 let lastRandomUpdate = null;
 
-// ==== НАСТРОЙКИ GITHUB ==== // НОВОЕ
-const GITHUB_OWNER = process.env.GITHUB_OWNER; // Берем из настроек Render
-const GITHUB_REPO = process.env.GITHUB_REPO;   // Берем из настроек Render
-const GITHUB_PATH = 'articles_backup/'; // Папка в репо для статей
+// ==== НАСТРОЙКИ GITHUB ====
+const GITHUB_OWNER = process.env.GITHUB_OWNER;
+const GITHUB_REPO = process.env.GITHUB_REPO;
+const GITHUB_PATH = 'articles_backup/';
 
-let octokit; // Объявляем переменную
+let octokit;
 if (process.env.GITHUB_TOKEN) {
-  octokit = new Octokit({ auth: process.env.GITHUB_TOKEN }); // Создаем клиент, если токен есть
+  octokit = new Octokit({ auth: process.env.GITHUB_TOKEN });
   console.log('🔑 GitHub клиент инициализирован.');
 } else {
   console.log('⚠️  GITHUB_TOKEN не задан. Сохранение в GitHub отключено.');
@@ -125,41 +128,62 @@ async function backupArticle(title, content) {
 }
 
 // Восстанавливаем статьи из бэкапа при запуске
-async function restoreFromBackup() {
+app.post('/save/:title', requireAuth, async (req, res) => {
     try {
-        const files = await fs.readdir(ARTICLES_BACKUP_DIR);
-        console.log(`📁 Найдено файлов в бэкапе: ${files.length}`);
-        
-        let restoredCount = 0;
-        
-        for (const file of files) {
-            if (file.endsWith('.md')) {
-                const filepath = path.join(ARTICLES_BACKUP_DIR, file);
-                const content = await fs.readFile(filepath, 'utf8');
-                const title = file.replace('.md', '').replace(/_/g, ' ');
-                
-                console.log(`🔍 Проверяем статью: "${title}"`);
-                
-                // Проверяем есть ли статья в БД
-                const existing = await db.getAsync('SELECT id FROM articles WHERE title = ?', [title]);
-                
-                if (!existing) {
-                    console.log(`➕ Добавляем статью: "${title}"`);
-                    await db.runAsync(
-                        'INSERT OR IGNORE INTO articles (title, content) VALUES (?, ?)',
-                        [title, content]
-                    );
-                    restoredCount++;
-                } else {
-                    console.log(`⏩ Статья уже существует: "${title}"`);
-                }
-            }
+        const title = req.params.title;
+        const content = req.body.content;
+
+        // 1. Пытаемся сохранить в GitHub
+        await saveArticleToGitHub(title, content);
+
+        // 2. Сохраняем в локальную базу (обязательно!)
+        const existingArticle = await db.getAsync('SELECT * FROM articles WHERE title = ?', [title]);
+        if (existingArticle) {
+            await db.runAsync(
+                'UPDATE articles SET content = ?, updated_at = CURRENT_TIMESTAMP WHERE title = ?',
+                [content, title]
+            );
+        } else {
+            await db.runAsync(
+                'INSERT INTO articles (title, content) VALUES (?, ?)',
+                [title, content]
+            );
         }
-        console.log(`✅ Восстановлено статей из бэкапа: ${restoredCount}`);
+
+        // 3. Локальный бэкап
+        await backupArticle(title, content);
+
+        res.redirect(`/article/${title}`);
     } catch (error) {
-        console.error('❌ Ошибка восстановления:', error);
+        console.error('Ошибка сохранения:', error);
+        res.status(500).send('Ошибка при сохранении статьи');
     }
-}
+});
+
+app.post('/create', async (req, res) => {
+    try {
+        const { title, content } = req.body;
+        console.log('Создание статьи:', title);
+        if (!title) return res.send('Введите название статьи');
+        
+        const articleContent = content || '# ' + title;
+        
+        // 1. GitHub
+        await saveArticleToGitHub(title, articleContent);
+        
+        // 2. Локальная база
+        await db.runAsync('INSERT INTO articles (title, content) VALUES (?, ?)', [title, articleContent]);
+        
+        // 3. Локальный бэкап
+        await backupArticle(title, articleContent);
+        
+        console.log('✅ Статья создана:', title);
+        res.redirect(`/article/${title}`);
+    } catch (error) {
+        console.error('Ошибка создания:', error);
+        res.send('Ошибка: ' + error.message);
+    }
+});
 
 async function getTodaysRandomArticle() {
     try {
