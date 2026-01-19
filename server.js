@@ -268,7 +268,7 @@ app.post('/create', async (req, res) => {
         const { title, content } = req.body;
         console.log('Создание статьи:', title);
         if (!title) { return res.send('Введите название статьи'); }
-        const articleContent = content || '# ' + title;
+        const articleContent = content || '# ' + title + '\n\nНачните писать вашу статью здесь...';
         
         // 1. Сохраняем в GitHub
         await saveArticleToGitHub(title, articleContent);
@@ -291,11 +291,22 @@ app.post('/create', async (req, res) => {
 app.get('/search', async (req, res) => {
     try {
         const query = req.query.q;
-        if (!query) { return res.render('search', { results: [], query: '', user: req.session.user }); }
+        if (!query) { 
+            return res.render('search', { 
+                results: [], 
+                query: '', 
+                user: req.session.user 
+            }); 
+        }
         const results = await db.allAsync(`SELECT a.* FROM articles a WHERE a.content LIKE ? OR a.title LIKE ? ORDER BY a.updated_at DESC`, [`%${query}%`, `%${query}%`]);
-        res.render('search', { results: results, query: query, user: req.session.user });
+        res.render('search', { 
+            results: results, 
+            query: query, 
+            user: req.session.user 
+        });
     } catch (error) {
-        console.error('Ошибка поиска:', error); res.status(500).send('Ошибка при поиске');
+        console.error('Ошибка поиска:', error); 
+        res.status(500).send('Ошибка при поиске');
     }
 });
 
@@ -307,7 +318,8 @@ app.post('/comment/:articleId', requireAuth, async (req, res) => {
         await db.runAsync('INSERT INTO comments (article_id, content) VALUES (?, ?)', [articleId, content]);
         res.redirect(`/article/${articleTitle}`);
     } catch (error) {
-        console.error('Ошибка при добавлении комментария:', error); res.status(500).send('Ошибка при добавлении комментария');
+        console.error('Ошибка при добавлении комментария:', error); 
+        res.status(500).send('Ошибка при добавлении комментария');
     }
 });
 
@@ -315,11 +327,14 @@ app.get('/article/:title/comments', async (req, res) => {
     try {
         const title = req.params.title;
         const article = await db.getAsync('SELECT id FROM articles WHERE title = ?', [title]);
-        if (!article) { return res.status(404).send('Статья не найдена'); }
+        if (!article) { 
+            return res.status(404).send('Статья не найдена'); 
+        }
         const comments = await db.allAsync('SELECT * FROM comments WHERE article_id = ? ORDER BY created_at DESC', [article.id]);
         res.json(comments);
     } catch (error) {
-        console.error('Ошибка:', error); res.status(500).json({ error: 'Ошибка при загрузке комментариев' });
+        console.error('Ошибка:', error); 
+        res.status(500).json({ error: 'Ошибка при загрузке комментариев' });
     }
 });
 
@@ -327,7 +342,9 @@ app.get('/export/pdf/:title', async (req, res) => {
     try {
         const title = req.params.title;
         const article = await db.getAsync('SELECT a.* FROM articles a WHERE a.title = ?', [title]);
-        if (!article) { return res.status(404).send('Статья не найдена'); }
+        if (!article) { 
+            return res.status(404).send('Статья не найдена'); 
+        }
         const doc = new PDFDocument();
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Content-Disposition', `attachment; filename="${title}.pdf"`);
@@ -339,7 +356,8 @@ app.get('/export/pdf/:title', async (req, res) => {
         doc.fontSize(12).text(plainContent, 100, 200, { align: 'justify' });
         doc.end();
     } catch (error) {
-        console.error('Ошибка экспорта:', error); res.status(500).send('Ошибка при экспорте в PDF');
+        console.error('Ошибка экспорта:', error); 
+        res.status(500).send('Ошибка при экспорте в PDF');
     }
 });
 
@@ -348,7 +366,8 @@ async function getAllArticles() {
         const articles = await db.allAsync('SELECT title FROM articles ORDER BY updated_at DESC');
         return articles.map(article => article.title);
     } catch (error) {
-        console.log('Ошибка получения статей:', error); return [];
+        console.log('Ошибка получения статей:', error); 
+        return [];
     }
 }
 
@@ -360,12 +379,27 @@ app.get('/', async (req, res) => {
         const randomArticleData = await getTodaysRandomArticle();
         let randomArticle = null;
         if (randomArticleData) {
-            randomArticle = { title: randomArticleData.title, content: randomArticleData.content.substring(0, 150) + '...' };
+            randomArticle = { 
+                title: randomArticleData.title, 
+                content: randomArticleData.content.substring(0, 150) + '...' 
+            };
         }
-        res.render('index', { articles: articles, recentArticles: recentArticles, popularArticles: popularArticles, randomArticle: randomArticle, user: req.session.user });
+        res.render('index', { 
+            articles: articles, 
+            recentArticles: recentArticles, 
+            popularArticles: popularArticles, 
+            randomArticle: randomArticle, 
+            user: req.session.user 
+        });
     } catch (error) {
         console.error('Ошибка главной страницы:', error);
-        res.render('index', { articles: [], recentArticles: [], popularArticles: [], randomArticle: null, user: req.session.user });
+        res.render('index', { 
+            articles: [], 
+            recentArticles: [], 
+            popularArticles: [], 
+            randomArticle: null, 
+            user: req.session.user 
+        });
     }
 });
 
@@ -375,11 +409,29 @@ app.get('/article/:title', async (req, res) => {
         const article = await db.getAsync('SELECT * FROM articles WHERE title = ?', [title]);
         if (article) {
             const content = marked(article.content);
-            return res.render('article', { title: article.title, content: content, article: article, user: req.session.user });
+            return res.render('article', { 
+                title: article.title, 
+                content: content, 
+                article: article,  // ✅ Статья существует
+                user: req.session.user 
+            });
         }
-        res.status(404).render('article', { title: 'Статья не найдена', content: '<p>Запрошенная статья не существует.</p><p><a href="/">Вернуться на главную</a></p><p><a href="/create">Создать эту статью</a></p>', user: req.session.user });
+        // ✅ ИСПРАВЛЕНО: добавляем article: null для 404 страницы
+        res.status(404).render('article', { 
+            title: 'Статья не найдена', 
+            content: '<p>Запрошенная статья не существует.</p><p><a href="/">Вернуться на главную</a></p><p><a href="/create">Создать эту статью</a></p>', 
+            article: null,  // ← ВАЖНО: передаем null вместо undefined
+            user: req.session.user 
+        });
     } catch (error) {
-        console.error('Ошибка загрузки статьи:', error); res.status(500).send('Ошибка при загрузке статьи');
+        console.error('Ошибка загрузки статьи:', error); 
+        // ✅ ИСПРАВЛЕНО: добавляем article: null для страницы ошибки
+        res.status(500).render('article', {
+            title: 'Ошибка',
+            content: '<p>Ошибка при загрузке статьи.</p><p><a href="/">Вернуться на главную</a></p>',
+            article: null,
+            user: req.session.user
+        });
     }
 });
 
@@ -388,10 +440,19 @@ app.get('/edit/:title', requireAuth, async (req, res) => {
         const title = req.params.title;
         const article = await db.getAsync('SELECT * FROM articles WHERE title = ?', [title]);
         let content = '';
-        if (article) { content = article.content; } else { content = '# ' + title + '\n\nНачните писать вашу статью здесь...'; }
-        res.render('edit', { title: title, content: content, user: req.session.user });
+        if (article) { 
+            content = article.content; 
+        } else { 
+            content = '# ' + title + '\n\nНачните писать вашу статью здесь...'; 
+        }
+        res.render('edit', { 
+            title: title, 
+            content: content, 
+            user: req.session.user 
+        });
     } catch (error) {
-        console.error('Ошибка:', error); res.status(500).send('Ошибка при загрузке редактора');
+        console.error('Ошибка:', error); 
+        res.status(500).send('Ошибка при загрузке редактора');
     }
 });
 
@@ -399,25 +460,36 @@ app.post('/delete/:title', requireAdmin, async (req, res) => {
     try {
         const title = req.params.title;
         const article = await db.getAsync('SELECT id FROM articles WHERE title = ?', [title]);
-        if (article) { await db.runAsync('DELETE FROM articles WHERE id = ?', [article.id]); }
+        if (article) { 
+            await db.runAsync('DELETE FROM articles WHERE id = ?', [article.id]); 
+        }
         res.redirect('/');
     } catch (error) {
-        console.error('Ошибка удаления статьи:', error); res.status(500).send('Ошибка при удалении статьи');
+        console.error('Ошибка удаления статьи:', error); 
+        res.status(500).send('Ошибка при удалении статьи');
     }
 });
 
 app.get('/admin-panel', async (req, res) => {
-    if (req.session.user !== 'admin') { return res.redirect('/admin'); }
+    if (req.session.user !== 'admin') { 
+        return res.redirect('/admin'); 
+    }
     try {
         const articles = await db.allAsync('SELECT * FROM articles ORDER BY updated_at DESC');
-        res.render('admin-panel', { articles: articles, user: req.session.user });
+        res.render('admin-panel', { 
+            articles: articles, 
+            user: req.session.user 
+        });
     } catch (error) {
-        console.error('Ошибка админки:', error); res.status(500).send('Ошибка загрузки админки');
+        console.error('Ошибка админки:', error); 
+        res.status(500).send('Ошибка загрузки админки');
     }
 });
 
 app.get('/create', requireAuth, (req, res) => {
-    res.render('create', { user: req.session.user });
+    res.render('create', { 
+        user: req.session.user 
+    });
 });
 
 app.get('/admin', (req, res) => {
